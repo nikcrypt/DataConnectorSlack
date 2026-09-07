@@ -1,0 +1,18 @@
+{
+  "connector": "slack",
+  "objects": [
+    "workspaces",
+    "users",
+    "userGroups",
+    "channels",
+    "messages",
+    "threads",
+    "reactions",
+    "files"
+  ],
+  "options": {
+    "historyDays": 30,
+    "excludeArchivedChannels": true,
+    "downloadFileBytes": false
+  }
+}
