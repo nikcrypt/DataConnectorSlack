@@ -1,14 +1,17 @@
 {
   "name": "data-connector-app-poc",
   "version": "1.0.0",
-  "description": "Data connector POC — Slack workspace extraction with Node.js",
+  "description": "Data connector POC — Slack and PostgreSQL extraction with Node.js",
   "type": "module",
   "main": "src/index.js",
   "scripts": {
     "auth": "node src/auth-server.js",
     "auth:status": "node src/cli.js auth-status",
     "test:connection": "node src/cli.js test",
+    "test:postgres": "node src/cli.js test --connector postgres",
     "extract": "node src/cli.js extract",
+    "extract:slack": "node src/cli.js extract --connector slack",
+    "extract:postgres": "node src/cli.js extract --connector postgres",
     "extract:users": "node src/cli.js extract --objects users",
     "extract:channels": "node src/cli.js extract --objects channels",
     "extract:messages": "node src/cli.js extract --objects messages"
@@ -17,6 +20,7 @@
     "node": ">=18"
   },
   "dependencies": {
-    "dotenv": "^16.4.7"
+    "dotenv": "^16.4.7",
+    "pg": "^8.13.1"
   }
 }

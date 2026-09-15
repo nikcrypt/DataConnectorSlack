@@ -1,4 +1,17 @@
-# Slack Connector (Node.js POC)
+# Data Connector POC (Node.js)
+
+Slack workspace extract + PostgreSQL catalog metadata extract, using the same shared contract (CLI → Runtime → Connector → output).
+
+## Connectors
+
+| Connector | Objects | Output |
+|---|---|---|
+| **slack** | workspaces, users, channels, messages, … | `data/output/slack/*.jsonl` |
+| **postgres** | schemas, tables, views, columns | `data/output/postgres/*.jsonl` |
+
+---
+
+# Slack Connector
 
 Extract Slack workspace data via OAuth-authenticated bot token.
 
@@ -95,3 +108,70 @@ src/
 | Bot token (`xoxb-`) | All Web API extract calls |
 
 File **binary** download remains out of scope; only file metadata is extracted.
+
+---
+
+# PostgreSQL Connector
+
+Extract **database metadata** from PostgreSQL via `information_schema` (not table row data).
+
+## 1. Database setup
+
+Create a read-only role (example):
+
+```sql
+CREATE ROLE connector_reader LOGIN PASSWORD 'your-password';
+GRANT CONNECT ON DATABASE appdb TO connector_reader;
+GRANT USAGE ON SCHEMA public TO connector_reader;
+-- metadata usually works with USAGE; add SELECT if your setup requires it
+```
+
+## 2. Configure `.env`
+
+```bash
+cp .env.example .env
+```
+
+Either:
+
+```env
+POSTGRES_URL=postgresql://connector_reader:password@localhost:5432/appdb
+```
+
+Or:
+
+```env
+POSTGRES_HOST=localhost
+POSTGRES_PORT=5432
+POSTGRES_DATABASE=appdb
+POSTGRES_USER=connector_reader
+POSTGRES_PASSWORD=your-password
+POSTGRES_SSL=false
+# POSTGRES_SCHEMAS=public
+```
+
+## 3. Run
+
+```bash
+npm run test:postgres
+npm run extract:postgres
+npm run extract -- --connector postgres --objects schemas,tables,columns
+```
+
+Output: `data/output/postgres/schemas.jsonl`, `tables.jsonl`, `views.jsonl`, `columns.jsonl`
+
+## Project layout (Postgres)
+
+```text
+connectors/postgres/PostgresClient.js    SQL + connection
+connectors/postgres/PostgresConnector.js extract + normalise
+config/connectors/postgres.json
+```
+
+Same flow as Slack:
+
+```text
+CLI → PostgresConnector → PostgresClient → PostgreSQL
+                ↓
+        ConnectorRuntimeEngine → data/output/postgres/
+```

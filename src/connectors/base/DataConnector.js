@@ -28,4 +28,9 @@ export class DataConnector {
   getCheckpoint(object) {
     return null;
   }
+
+  /** @returns {string} e.g. slack, postgres */
+  getConnectorKey() {
+    return "unknown";
+  }
 }

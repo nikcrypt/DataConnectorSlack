@@ -40,6 +40,10 @@ export class SlackConnector extends DataConnector {
     this._auth = null;
   }
 
+  getConnectorKey() {
+    return "slack";
+  }
+
   getObjects() {
     return [...OBJECTS];
   }

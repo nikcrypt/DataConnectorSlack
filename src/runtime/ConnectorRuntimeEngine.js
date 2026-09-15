@@ -17,19 +17,21 @@ export class ConnectorRuntimeEngine {
 
   async run({ objects, mode = "full" } = {}) {
     const selected = objects?.length ? objects : this.connector.getObjects();
+    const connectorKey = this.connector.getConnectorKey?.() || "unknown";
     const startedAt = new Date().toISOString();
     const summary = {
-      connector: "slack",
+      connector: connectorKey,
       mode,
       startedAt,
       objects: {},
     };
 
-    await mkdir(this.outputDir, { recursive: true });
+    const connectorOutputDir = path.join(this.outputDir, connectorKey);
+    await mkdir(connectorOutputDir, { recursive: true });
 
     for (const object of selected) {
       const counts = { extracted: 0 };
-      const outPath = path.join(this.outputDir, `${object}.jsonl`);
+      const outPath = path.join(connectorOutputDir, `${object}.jsonl`);
       const lines = [];
 
       console.log(`[runtime] extracting ${object}...`);
@@ -48,7 +50,7 @@ export class ConnectorRuntimeEngine {
     }
 
     summary.finishedAt = new Date().toISOString();
-    const summaryPath = path.join(this.outputDir, "run-summary.json");
+    const summaryPath = path.join(connectorOutputDir, "run-summary.json");
     await writeFile(summaryPath, JSON.stringify(summary, null, 2), "utf8");
     console.log(`[runtime] summary -> ${summaryPath}`);
     return summary;
