@@ -1,6 +1,6 @@
 # Data Connector POC (Node.js)
 
-Slack workspace extract + PostgreSQL catalog metadata extract, using the same shared contract (CLI → Runtime → Connector → output).
+Slack workspace extract + PostgreSQL catalog metadata + SharePoint Online (Microsoft Graph), using the same shared contract (CLI → Runtime → Connector → output).
 
 ## Connectors
 
@@ -8,6 +8,7 @@ Slack workspace extract + PostgreSQL catalog metadata extract, using the same sh
 |---|---|---|
 | **slack** | workspaces, users, channels, messages, … | `data/output/slack/*.jsonl` |
 | **postgres** | schemas, tables, views, columns | `data/output/postgres/*.jsonl` |
+| **sharepoint** | sites, lists, columns, listItems, drives, driveItems | `data/output/sharepoint/*.jsonl` |
 
 ---
 
@@ -174,4 +175,67 @@ Same flow as Slack:
 CLI → PostgresConnector → PostgresClient → PostgreSQL
                 ↓
         ConnectorRuntimeEngine → data/output/postgres/
+```
+
+---
+
+# SharePoint Connector
+
+Extract SharePoint Online site content via **Microsoft Graph** using **app-only** (client credentials) auth.
+
+Objects:
+
+| Object | Meaning |
+|---|---|
+| `sites` | Configured site metadata |
+| `lists` | Lists in the site |
+| `columns` | List column/schema definitions |
+| `listItems` | List rows (`fields`) |
+| `drives` | Document libraries |
+| `driveItems` | Files/folders metadata (no binary download) |
+
+## 1. Entra app registration
+
+1. Azure Portal → **Microsoft Entra ID** → **App registrations** → New registration  
+2. Copy **Directory (tenant) ID** and **Application (client) ID**  
+3. **Certificates & secrets** → create a client secret  
+4. **API permissions** → Microsoft Graph → **Application** permissions:
+   - `Sites.Read.All` (broad; needs admin consent), or  
+   - `Sites.Selected` (narrower; grant site access separately)  
+5. Click **Grant admin consent**
+
+## 2. Configure `.env`
+
+```env
+SHAREPOINT_TENANT_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+SHAREPOINT_CLIENT_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+SHAREPOINT_CLIENT_SECRET=your-client-secret
+SHAREPOINT_HOSTNAME=contoso.sharepoint.com
+SHAREPOINT_SITE_PATH=/sites/engineering
+```
+
+`SHAREPOINT_SITE_PATH` is the server-relative site path (`/` for root site).
+
+## 3. Run
+
+```bash
+npm run test:sharepoint
+npm run extract:sharepoint
+npm run extract -- --connector sharepoint --objects sites,lists,columns
+```
+
+Output: `data/output/sharepoint/*.jsonl`
+
+## Project layout (SharePoint)
+
+```text
+connectors/sharepoint/SharePointClient.js     Graph + token
+connectors/sharepoint/SharePointConnector.js  extract + normalise
+config/connectors/sharepoint.json
+```
+
+```text
+CLI → SharePointConnector → SharePointClient → Microsoft Graph → SharePoint
+                ↓
+        ConnectorRuntimeEngine → data/output/sharepoint/
 ```

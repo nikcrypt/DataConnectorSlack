@@ -1,0 +1,8 @@
+{
+  "connector": "sharepoint",
+  "objects": ["sites", "lists", "columns", "listItems", "drives", "driveItems"],
+  "options": {
+    "downloadFileBytes": false,
+    "maxDriveDepth": 5
+  }
+}

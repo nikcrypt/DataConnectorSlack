@@ -1,6 +1,7 @@
 import "dotenv/config";
 import { SlackConnector } from "./connectors/slack/SlackConnector.js";
 import { PostgresConnector } from "./connectors/postgres/PostgresConnector.js";
+import { SharePointConnector } from "./connectors/sharepoint/SharePointConnector.js";
 import { ConnectorRuntimeEngine } from "./runtime/ConnectorRuntimeEngine.js";
 import { loadSlackAuth, getBotTokenFromEnvOrAuth } from "./connectors/slack/tokenStore.js";
 
@@ -56,14 +57,21 @@ function createConnector(name) {
       return loadSlackConfig().then((config) => new SlackConnector(config));
     case "postgres":
       return Promise.resolve(PostgresConnector.fromEnv());
+    case "sharepoint":
+      return Promise.resolve(SharePointConnector.fromEnv());
     default:
-      throw new Error(`Unknown connector: ${name}. Use slack or postgres.`);
+      throw new Error(
+        `Unknown connector: ${name}. Use slack, postgres, or sharepoint.`
+      );
   }
 }
 
 function defaultObjects(connectorKey) {
   if (connectorKey === "postgres") {
     return ["schemas", "tables", "views", "columns"];
+  }
+  if (connectorKey === "sharepoint") {
+    return ["sites", "lists", "columns", "listItems", "drives", "driveItems"];
   }
   return [
     "workspaces",
@@ -139,22 +147,26 @@ function printHelp() {
   console.log(`
 Data connector CLI
 
-  npm run test:connection
-  npm run test:connection -- --connector postgres
-  npm run extract
-  npm run extract -- --connector postgres
-  npm run extract -- --connector postgres --objects schemas,tables,columns
-  npm run extract:slack -- --objects users,channels
+  npm run test:connection -- --connector slack|postgres|sharepoint
+  npm run extract -- --connector slack|postgres|sharepoint
+  npm run extract -- --connector sharepoint --objects sites,lists,columns
+  npm run extract:slack
   npm run extract:postgres
+  npm run extract:sharepoint
 
-Slack setup:
-  SLACK_BOT_TOKEN in .env  (or npm run auth)
+Slack:
+  SLACK_BOT_TOKEN in .env
 
-Postgres setup:
-  POSTGRES_HOST, POSTGRES_DATABASE, POSTGRES_USER, POSTGRES_PASSWORD in .env
-  (or POSTGRES_URL=postgresql://user:pass@host:5432/dbname)
-  Optional: POSTGRES_SCHEMAS=public,app
-  Optional: POSTGRES_SSL=true
+Postgres:
+  POSTGRES_URL or POSTGRES_HOST / DATABASE / USER / PASSWORD
+
+SharePoint (Microsoft Graph app-only):
+  SHAREPOINT_TENANT_ID
+  SHAREPOINT_CLIENT_ID
+  SHAREPOINT_CLIENT_SECRET
+  SHAREPOINT_HOSTNAME=contoso.sharepoint.com
+  SHAREPOINT_SITE_PATH=/sites/engineering
+  Graph app permission: Sites.Read.All (admin consent) or Sites.Selected
 `);
 }
 
