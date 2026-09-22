@@ -2,6 +2,7 @@ import "dotenv/config";
 import { SlackConnector } from "./connectors/slack/SlackConnector.js";
 import { PostgresConnector } from "./connectors/postgres/PostgresConnector.js";
 import { SharePointConnector } from "./connectors/sharepoint/SharePointConnector.js";
+import { SalesforceConnector } from "./connectors/salesforce/SalesforceConnector.js";
 import { ConnectorRuntimeEngine } from "./runtime/ConnectorRuntimeEngine.js";
 import { loadSlackAuth, getBotTokenFromEnvOrAuth } from "./connectors/slack/tokenStore.js";
 
@@ -59,9 +60,11 @@ function createConnector(name) {
       return Promise.resolve(PostgresConnector.fromEnv());
     case "sharepoint":
       return Promise.resolve(SharePointConnector.fromEnv());
+    case "salesforce":
+      return Promise.resolve(SalesforceConnector.fromEnv());
     default:
       throw new Error(
-        `Unknown connector: ${name}. Use slack, postgres, or sharepoint.`
+        `Unknown connector: ${name}. Use slack, postgres, sharepoint, or salesforce.`
       );
   }
 }
@@ -72,6 +75,9 @@ function defaultObjects(connectorKey) {
   }
   if (connectorKey === "sharepoint") {
     return ["sites", "lists", "columns", "listItems", "drives", "driveItems"];
+  }
+  if (connectorKey === "salesforce") {
+    return ["sobjects", "fields", "records"];
   }
   return [
     "workspaces",
@@ -147,26 +153,25 @@ function printHelp() {
   console.log(`
 Data connector CLI
 
-  npm run test:connection -- --connector slack|postgres|sharepoint
-  npm run extract -- --connector slack|postgres|sharepoint
-  npm run extract -- --connector sharepoint --objects sites,lists,columns
-  npm run extract:slack
-  npm run extract:postgres
-  npm run extract:sharepoint
+  npm run test:connection -- --connector slack|postgres|sharepoint|salesforce
+  npm run extract -- --connector salesforce
+  npm run extract -- --connector salesforce --objects sobjects,fields,records
+  npm run extract:slack | extract:postgres | extract:sharepoint | extract:salesforce
 
 Slack:
-  SLACK_BOT_TOKEN in .env
+  SLACK_BOT_TOKEN
 
 Postgres:
-  POSTGRES_URL or POSTGRES_HOST / DATABASE / USER / PASSWORD
+  POSTGRES_URL or HOST/DATABASE/USER/PASSWORD
 
-SharePoint (Microsoft Graph app-only):
-  SHAREPOINT_TENANT_ID
-  SHAREPOINT_CLIENT_ID
-  SHAREPOINT_CLIENT_SECRET
-  SHAREPOINT_HOSTNAME=contoso.sharepoint.com
-  SHAREPOINT_SITE_PATH=/sites/engineering
-  Graph app permission: Sites.Read.All (admin consent) or Sites.Selected
+SharePoint:
+  SHAREPOINT_TENANT_ID, CLIENT_ID, CLIENT_SECRET, HOSTNAME, SITE_PATH
+
+Salesforce:
+  SALESFORCE_LOGIN_URL=https://login.salesforce.com
+  SALESFORCE_CLIENT_ID / SALESFORCE_CLIENT_SECRET
+  SALESFORCE_USERNAME / SALESFORCE_PASSWORD / SALESFORCE_SECURITY_TOKEN
+  SALESFORCE_OBJECTS=Account,Contact,Opportunity
 `);
 }
 

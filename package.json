@@ -1,7 +1,7 @@
 {
   "name": "data-connector-app-poc",
   "version": "1.0.0",
-  "description": "Data connector POC — Slack, PostgreSQL, and SharePoint extraction with Node.js",
+  "description": "Data connector POC — Slack, PostgreSQL, SharePoint, and Salesforce extraction with Node.js",
   "type": "module",
   "main": "src/index.js",
   "scripts": {
@@ -10,10 +10,12 @@
     "test:connection": "node src/cli.js test",
     "test:postgres": "node src/cli.js test --connector postgres",
     "test:sharepoint": "node src/cli.js test --connector sharepoint",
+    "test:salesforce": "node src/cli.js test --connector salesforce",
     "extract": "node src/cli.js extract",
     "extract:slack": "node src/cli.js extract --connector slack",
     "extract:postgres": "node src/cli.js extract --connector postgres",
     "extract:sharepoint": "node src/cli.js extract --connector sharepoint",
+    "extract:salesforce": "node src/cli.js extract --connector salesforce",
     "extract:users": "node src/cli.js extract --objects users",
     "extract:channels": "node src/cli.js extract --objects channels",
     "extract:messages": "node src/cli.js extract --objects messages"

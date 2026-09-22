@@ -4,4 +4,7 @@ node_modules/
 .DS_Store
 data/output/
 data/slack-auth.json
+certs/
+*.key
+*.pem
 *.log

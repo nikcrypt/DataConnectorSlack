@@ -1,6 +1,6 @@
 # Data Connector POC (Node.js)
 
-Slack workspace extract + PostgreSQL catalog metadata + SharePoint Online (Microsoft Graph), using the same shared contract (CLI → Runtime → Connector → output).
+Slack workspace extract + PostgreSQL catalog metadata + SharePoint Online + Salesforce, using the same shared contract (CLI → Runtime → Connector → output).
 
 ## Connectors
 
@@ -9,6 +9,7 @@ Slack workspace extract + PostgreSQL catalog metadata + SharePoint Online (Micro
 | **slack** | workspaces, users, channels, messages, … | `data/output/slack/*.jsonl` |
 | **postgres** | schemas, tables, views, columns | `data/output/postgres/*.jsonl` |
 | **sharepoint** | sites, lists, columns, listItems, drives, driveItems | `data/output/sharepoint/*.jsonl` |
+| **salesforce** | sobjects, fields, records | `data/output/salesforce/*.jsonl` |
 
 ---
 
@@ -238,4 +239,71 @@ config/connectors/sharepoint.json
 CLI → SharePointConnector → SharePointClient → Microsoft Graph → SharePoint
                 ↓
         ConnectorRuntimeEngine → data/output/sharepoint/
+```
+
+---
+
+# Salesforce Connector
+
+Extract Salesforce metadata and records via the REST API using a Connected App.
+
+| Object | Meaning |
+|---|---|
+| `sobjects` | Catalog of Salesforce objects |
+| `fields` | Field describe for configured objects |
+| `records` | SOQL rows for configured objects (default limit 200 each) |
+
+## 1. Connected App setup
+
+1. Salesforce Setup → **App Manager** → **New Connected App**
+2. Enable **OAuth Settings**
+3. Callback URL can be `https://login.salesforce.com/services/oauth2/success` for POC
+4. Selected OAuth scopes: **Manage user data via APIs (api)** (and others as needed)
+5. For password grant POC: enable allowing username-password (org policy permitting)
+6. Or enable **Client Credentials Flow** for server-to-server (no username)
+7. Save → copy **Consumer Key** (client id) and **Consumer Secret**
+
+## 2. Configure `.env`
+
+```env
+SALESFORCE_LOGIN_URL=https://login.salesforce.com
+# sandbox: https://test.salesforce.com
+SALESFORCE_CLIENT_ID=...
+SALESFORCE_CLIENT_SECRET=...
+
+# Password grant (typical POC):
+SALESFORCE_USERNAME=you@company.com
+SALESFORCE_PASSWORD=your-password
+SALESFORCE_SECURITY_TOKEN=your-security-token
+
+# Which objects to describe/query:
+SALESFORCE_OBJECTS=Account,Contact,Opportunity
+SALESFORCE_RECORD_LIMIT=200
+```
+
+If `USERNAME`/`PASSWORD` are omitted, the connector tries **client_credentials**.
+
+## 3. Run
+
+```bash
+npm run test:salesforce
+npm run extract:salesforce
+npm run extract -- --connector salesforce --objects sobjects,fields
+npm run extract -- --connector salesforce --objects records
+```
+
+Output: `data/output/salesforce/*.jsonl`
+
+## Project layout (Salesforce)
+
+```text
+connectors/salesforce/SalesforceClient.js
+connectors/salesforce/SalesforceConnector.js
+config/connectors/salesforce.json
+```
+
+```text
+CLI → SalesforceConnector → SalesforceClient → Salesforce REST API
+                ↓
+        ConnectorRuntimeEngine → data/output/salesforce/
 ```
