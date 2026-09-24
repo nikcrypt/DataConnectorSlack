@@ -3,6 +3,8 @@ import { SlackConnector } from "./connectors/slack/SlackConnector.js";
 import { PostgresConnector } from "./connectors/postgres/PostgresConnector.js";
 import { SharePointConnector } from "./connectors/sharepoint/SharePointConnector.js";
 import { SalesforceConnector } from "./connectors/salesforce/SalesforceConnector.js";
+import { JiraConnector } from "./connectors/jira/JiraConnector.js";
+import { GoogleDriveConnector } from "./connectors/googledrive/GoogleDriveConnector.js";
 import { ConnectorRuntimeEngine } from "./runtime/ConnectorRuntimeEngine.js";
 import { loadSlackAuth, getBotTokenFromEnvOrAuth } from "./connectors/slack/tokenStore.js";
 
@@ -62,9 +64,15 @@ function createConnector(name) {
       return Promise.resolve(SharePointConnector.fromEnv());
     case "salesforce":
       return Promise.resolve(SalesforceConnector.fromEnv());
+    case "jira":
+      return Promise.resolve(JiraConnector.fromEnv());
+    case "googledrive":
+    case "google-drive":
+    case "gdrive":
+      return Promise.resolve(GoogleDriveConnector.fromEnv());
     default:
       throw new Error(
-        `Unknown connector: ${name}. Use slack, postgres, sharepoint, or salesforce.`
+        `Unknown connector: ${name}. Use slack, postgres, sharepoint, salesforce, jira, or googledrive.`
       );
   }
 }
@@ -78,6 +86,16 @@ function defaultObjects(connectorKey) {
   }
   if (connectorKey === "salesforce") {
     return ["sobjects", "fields", "records"];
+  }
+  if (connectorKey === "jira") {
+    return ["projects", "issues", "users", "statuses", "issueTypes"];
+  }
+  if (
+    connectorKey === "googledrive" ||
+    connectorKey === "google-drive" ||
+    connectorKey === "gdrive"
+  ) {
+    return ["drives", "files", "folders", "permissions"];
   }
   return [
     "workspaces",
@@ -153,10 +171,10 @@ function printHelp() {
   console.log(`
 Data connector CLI
 
-  npm run test:connection -- --connector slack|postgres|sharepoint|salesforce
-  npm run extract -- --connector salesforce
-  npm run extract -- --connector salesforce --objects sobjects,fields,records
-  npm run extract:slack | extract:postgres | extract:sharepoint | extract:salesforce
+  npm run test:connection -- --connector slack|postgres|sharepoint|salesforce|jira|googledrive
+  npm run extract -- --connector googledrive
+  npm run extract -- --connector googledrive --objects drives,files,folders
+  npm run extract:slack | extract:postgres | extract:sharepoint | extract:salesforce | extract:jira | extract:googledrive
 
 Slack:
   SLACK_BOT_TOKEN
@@ -168,10 +186,20 @@ SharePoint:
   SHAREPOINT_TENANT_ID, CLIENT_ID, CLIENT_SECRET, HOSTNAME, SITE_PATH
 
 Salesforce:
-  SALESFORCE_LOGIN_URL=https://login.salesforce.com
-  SALESFORCE_CLIENT_ID / SALESFORCE_CLIENT_SECRET
-  SALESFORCE_USERNAME / SALESFORCE_PASSWORD / SALESFORCE_SECURITY_TOKEN
-  SALESFORCE_OBJECTS=Account,Contact,Opportunity
+  SF_ACCESS_TOKEN + SF_INSTANCE_URL  (or client id/secret + password)
+
+Jira Cloud:
+  JIRA_BASE_URL=https://your-domain.atlassian.net
+  JIRA_EMAIL=you@company.com
+  JIRA_API_TOKEN=...
+  Optional: JIRA_JQL=project = ABC ORDER BY updated DESC
+  Optional: JIRA_MAX_ISSUES=500
+
+Google Drive:
+  GOOGLE_SERVICE_ACCOUNT_FILE=./certs/google-sa.json
+  Or: GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET + GOOGLE_REFRESH_TOKEN
+  Or: GOOGLE_ACCESS_TOKEN
+  Optional: GOOGLE_IMPERSONATE_USER, GOOGLE_DRIVE_MAX_FILES, GOOGLE_DRIVE_QUERY
 `);
 }
 

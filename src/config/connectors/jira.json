@@ -1,0 +1,8 @@
+{
+  "connector": "jira",
+  "objects": ["projects", "issues", "users", "statuses", "issueTypes"],
+  "options": {
+    "defaultJql": "ORDER BY updated DESC",
+    "maxIssues": 500
+  }
+}

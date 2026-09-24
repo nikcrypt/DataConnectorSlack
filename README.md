@@ -1,6 +1,6 @@
 # Data Connector POC (Node.js)
 
-Slack workspace extract + PostgreSQL catalog metadata + SharePoint Online + Salesforce, using the same shared contract (CLI → Runtime → Connector → output).
+Slack workspace extract + PostgreSQL catalog metadata + SharePoint Online + Salesforce + Jira Cloud + Google Drive, using the same shared contract (CLI → Runtime → Connector → output).
 
 ## Connectors
 
@@ -10,6 +10,8 @@ Slack workspace extract + PostgreSQL catalog metadata + SharePoint Online + Sale
 | **postgres** | schemas, tables, views, columns | `data/output/postgres/*.jsonl` |
 | **sharepoint** | sites, lists, columns, listItems, drives, driveItems | `data/output/sharepoint/*.jsonl` |
 | **salesforce** | sobjects, fields, records | `data/output/salesforce/*.jsonl` |
+| **jira** | projects, issues, users, statuses, issueTypes | `data/output/jira/*.jsonl` |
+| **googledrive** | drives, files, folders, permissions | `data/output/googledrive/*.jsonl` |
 
 ---
 
@@ -306,4 +308,131 @@ config/connectors/salesforce.json
 CLI → SalesforceConnector → SalesforceClient → Salesforce REST API
                 ↓
         ConnectorRuntimeEngine → data/output/salesforce/
+```
+
+---
+
+# Jira Connector
+
+Extract Jira Cloud projects and issues via REST API v3 using email + API token.
+
+| Object | Meaning |
+|---|---|
+| `projects` | Jira projects |
+| `issues` | Issues via JQL (default: recently updated) |
+| `users` | Users (needs Browse users permission) |
+| `statuses` | Global statuses |
+| `issueTypes` | Issue types |
+
+## 1. Create API token
+
+1. Go to [https://id.atlassian.com/manage-profile/security/api-tokens](https://id.atlassian.com/manage-profile/security/api-tokens)  
+2. **Create API token** → copy it  
+3. Use your Atlassian account email + this token (Basic auth)
+
+## 2. Configure `.env`
+
+```env
+JIRA_BASE_URL=https://your-domain.atlassian.net
+JIRA_EMAIL=you@company.com
+JIRA_API_TOKEN=your-api-token
+# Optional:
+# JIRA_JQL=project = ABC ORDER BY updated DESC
+# JIRA_MAX_ISSUES=500
+```
+
+## 3. Run
+
+```bash
+npm run test:jira
+npm run extract:jira
+npm run extract -- --connector jira --objects projects,issues
+```
+
+Output: `data/output/jira/*.jsonl`
+
+## Project layout (Jira)
+
+```text
+connectors/jira/JiraClient.js
+connectors/jira/JiraConnector.js
+config/connectors/jira.json
+```
+
+```text
+CLI → JiraConnector → JiraClient → Jira Cloud REST API
+                ↓
+        ConnectorRuntimeEngine → data/output/jira/
+```
+
+---
+
+# Google Drive Connector
+
+Extract Drive metadata (not file bytes) via Drive API v3.
+
+| Object | Meaning |
+|---|---|
+| `drives` | My Drive + shared drives |
+| `files` | Non-folder file metadata |
+| `folders` | Folder metadata |
+| `permissions` | ACL entries for a limited set of files |
+
+## 1. Auth options
+
+**A. Service account (typical POC)**
+
+1. Google Cloud Console → create a project → enable **Google Drive API**
+2. Create a **service account** → download JSON key → save as `certs/google-sa.json`
+3. Share the Drive folders/files you want with the service account email (`...@....iam.gserviceaccount.com`), **Viewer**
+4. (Workspace only) For full user Drive access without sharing each folder: enable domain-wide delegation and set `GOOGLE_IMPERSONATE_USER`
+
+**B. OAuth refresh token**
+
+Create an OAuth client (Desktop or Web), complete consent once, store refresh token:
+
+```env
+GOOGLE_CLIENT_ID=...
+GOOGLE_CLIENT_SECRET=...
+GOOGLE_REFRESH_TOKEN=...
+```
+
+**C. Short-lived bearer**
+
+```env
+GOOGLE_ACCESS_TOKEN=ya29....
+```
+
+## 2. Configure `.env`
+
+```env
+GOOGLE_SERVICE_ACCOUNT_FILE=./certs/google-sa.json
+# GOOGLE_IMPERSONATE_USER=user@company.com
+# GOOGLE_DRIVE_MAX_FILES=2000
+# GOOGLE_DRIVE_PERMISSION_FILE_LIMIT=50
+# GOOGLE_DRIVE_QUERY=name contains 'report'
+```
+
+## 3. Run
+
+```bash
+npm run test:googledrive
+npm run extract:googledrive
+npm run extract -- --connector googledrive --objects drives,files,folders
+```
+
+Output: `data/output/googledrive/*.jsonl`
+
+## Project layout (Google Drive)
+
+```text
+connectors/googledrive/GoogleDriveClient.js
+connectors/googledrive/GoogleDriveConnector.js
+config/connectors/googledrive.json
+```
+
+```text
+CLI → GoogleDriveConnector → GoogleDriveClient → Drive API v3
+                ↓
+        ConnectorRuntimeEngine → data/output/googledrive/
 ```

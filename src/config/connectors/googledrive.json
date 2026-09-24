@@ -1,0 +1,10 @@
+{
+  "connector": "googledrive",
+  "objects": ["drives", "files", "folders", "permissions"],
+  "options": {
+    "downloadFileBytes": false,
+    "maxFiles": 2000,
+    "includeSharedDrives": true,
+    "permissionFileLimit": 50
+  }
+}
