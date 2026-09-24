@@ -70,7 +70,7 @@ This saves the bot token to `data/slack-auth.json` (gitignored).
 
 ```bash
 npm run auth:status
-npm run test:connection
+npm run test:slack
 ```
 
 ## 3. Invite bot + extract
@@ -84,8 +84,8 @@ In Slack channels:
 Then:
 
 ```bash
-npm run extract
-npm run extract -- --objects users,channels
+npm run extract:slack
+npm run extract:slack -- --objects users,channels
 ```
 
 Output: `data/output/*.jsonl`

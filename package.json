@@ -8,6 +8,7 @@
     "auth": "node src/auth-server.js",
     "auth:status": "node src/cli.js auth-status",
     "test:connection": "node src/cli.js test",
+    "test:slack": "node src/cli.js test --connector slack",
     "test:postgres": "node src/cli.js test --connector postgres",
     "test:sharepoint": "node src/cli.js test --connector sharepoint",
     "test:salesforce": "node src/cli.js test --connector salesforce",
