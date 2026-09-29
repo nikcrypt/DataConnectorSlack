@@ -1,7 +1,7 @@
 {
   "name": "data-connector-app-poc",
   "version": "1.0.0",
-  "description": "Data connector POC — Slack, PostgreSQL, SharePoint, Salesforce, Jira, and Google Drive extraction with Node.js",
+  "description": "Data connector POC — Slack, PostgreSQL, Oracle, SharePoint, Salesforce, Jira, Google Drive, Box, and Confluence extraction with Node.js",
   "type": "module",
   "main": "src/index.js",
   "scripts": {
@@ -10,26 +10,34 @@
     "test:connection": "node src/cli.js test",
     "test:slack": "node src/cli.js test --connector slack",
     "test:postgres": "node src/cli.js test --connector postgres",
+    "test:oracle": "node src/cli.js test --connector oracle",
     "test:sharepoint": "node src/cli.js test --connector sharepoint",
     "test:salesforce": "node src/cli.js test --connector salesforce",
     "test:jira": "node src/cli.js test --connector jira",
     "test:googledrive": "node src/cli.js test --connector googledrive",
+    "test:box": "node src/cli.js test --connector box",
+    "test:confluence": "node src/cli.js test --connector confluence",
     "extract": "node src/cli.js extract",
     "extract:slack": "node src/cli.js extract --connector slack",
     "extract:postgres": "node src/cli.js extract --connector postgres",
+    "extract:oracle": "node src/cli.js extract --connector oracle",
     "extract:sharepoint": "node src/cli.js extract --connector sharepoint",
     "extract:salesforce": "node src/cli.js extract --connector salesforce",
     "extract:jira": "node src/cli.js extract --connector jira",
     "extract:googledrive": "node src/cli.js extract --connector googledrive",
+    "extract:box": "node src/cli.js extract --connector box",
+    "extract:confluence": "node src/cli.js extract --connector confluence",
     "extract:users": "node src/cli.js extract --objects users",
     "extract:channels": "node src/cli.js extract --objects channels",
-    "extract:messages": "node src/cli.js extract --objects messages"
+    "extract:messages": "node src/cli.js extract --objects messages",
+    "bench:slack": "node src/bench/runSlackBench.js"
   },
   "engines": {
     "node": ">=18"
   },
   "dependencies": {
     "dotenv": "^16.4.7",
+    "oracledb": "^6.10.0",
     "pg": "^8.13.1"
   }
 }

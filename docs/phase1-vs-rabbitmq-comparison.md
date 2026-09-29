@@ -5,6 +5,8 @@
 **Audience:** Engineering team and stakeholders  
 **Related POC:** Slack connector (`cli` → connector → runtime → files)
 
+> **Phase 2 update:** The recommended scalable design is now **Kafka + PostgreSQL + one Docker service per connector** (not RabbitMQ). See **[kafka-postgres-architecture.md](./kafka-postgres-architecture.md)**.
+
 ---
 
 ## 1. Summary

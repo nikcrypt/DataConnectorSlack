@@ -1,0 +1,11 @@
+{
+  "connector": "confluence",
+  "objects": ["spaces", "pages", "blogposts", "attachments"],
+  "options": {
+    "downloadAttachmentBytes": false,
+    "maxPages": 500,
+    "maxBlogposts": 200,
+    "attachmentPageLimit": 50,
+    "bodyExcerptChars": 2000
+  }
+}

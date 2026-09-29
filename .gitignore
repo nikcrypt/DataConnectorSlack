@@ -3,6 +3,7 @@ node_modules/
 .env.local
 .DS_Store
 data/output/
+data/bench/
 data/slack-auth.json
 certs/
 *.key

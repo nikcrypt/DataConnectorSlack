@@ -5,6 +5,9 @@ import { SharePointConnector } from "./connectors/sharepoint/SharePointConnector
 import { SalesforceConnector } from "./connectors/salesforce/SalesforceConnector.js";
 import { JiraConnector } from "./connectors/jira/JiraConnector.js";
 import { GoogleDriveConnector } from "./connectors/googledrive/GoogleDriveConnector.js";
+import { BoxConnector } from "./connectors/box/BoxConnector.js";
+import { ConfluenceConnector } from "./connectors/confluence/ConfluenceConnector.js";
+import { OracleConnector } from "./connectors/oracle/OracleConnector.js";
 import { ConnectorRuntimeEngine } from "./runtime/ConnectorRuntimeEngine.js";
 import { loadSlackAuth, getBotTokenFromEnvOrAuth } from "./connectors/slack/tokenStore.js";
 
@@ -70,15 +73,21 @@ function createConnector(name) {
     case "google-drive":
     case "gdrive":
       return Promise.resolve(GoogleDriveConnector.fromEnv());
+    case "box":
+      return Promise.resolve(BoxConnector.fromEnv());
+    case "confluence":
+      return Promise.resolve(ConfluenceConnector.fromEnv());
+    case "oracle":
+      return Promise.resolve(OracleConnector.fromEnv());
     default:
       throw new Error(
-        `Unknown connector: ${name}. Use slack, postgres, sharepoint, salesforce, jira, or googledrive.`
+        `Unknown connector: ${name}. Use slack, postgres, sharepoint, salesforce, jira, googledrive, box, confluence, or oracle.`
       );
   }
 }
 
 function defaultObjects(connectorKey) {
-  if (connectorKey === "postgres") {
+  if (connectorKey === "postgres" || connectorKey === "oracle") {
     return ["schemas", "tables", "views", "columns"];
   }
   if (connectorKey === "sharepoint") {
@@ -96,6 +105,12 @@ function defaultObjects(connectorKey) {
     connectorKey === "gdrive"
   ) {
     return ["drives", "files", "folders", "permissions"];
+  }
+  if (connectorKey === "box") {
+    return ["users", "folders", "files", "collaborations"];
+  }
+  if (connectorKey === "confluence") {
+    return ["spaces", "pages", "blogposts", "attachments"];
   }
   return [
     "workspaces",
@@ -171,16 +186,21 @@ function printHelp() {
   console.log(`
 Data connector CLI
 
-  npm run test:connection -- --connector slack|postgres|sharepoint|salesforce|jira|googledrive
-  npm run extract -- --connector googledrive
-  npm run extract -- --connector googledrive --objects drives,files,folders
-  npm run extract:slack | extract:postgres | extract:sharepoint | extract:salesforce | extract:jira | extract:googledrive
+  npm run test:connection -- --connector slack|postgres|oracle|sharepoint|salesforce|jira|googledrive|box|confluence
+  npm run extract -- --connector oracle
+  npm run extract -- --connector oracle --objects schemas,tables,columns
+  npm run extract:slack | extract:postgres | extract:oracle | extract:sharepoint | extract:salesforce | extract:jira | extract:googledrive | extract:box | extract:confluence
 
 Slack:
   SLACK_BOT_TOKEN
 
 Postgres:
   POSTGRES_URL or HOST/DATABASE/USER/PASSWORD
+
+Oracle:
+  ORACLE_USER + ORACLE_PASSWORD + ORACLE_CONNECT_STRING
+  Or: ORACLE_HOST + ORACLE_SERVICE_NAME (or ORACLE_SID)
+  Optional: ORACLE_SCHEMAS=HR,APP
 
 SharePoint:
   SHAREPOINT_TENANT_ID, CLIENT_ID, CLIENT_SECRET, HOSTNAME, SITE_PATH
@@ -192,7 +212,7 @@ Jira Cloud:
   JIRA_BASE_URL=https://your-domain.atlassian.net
   JIRA_EMAIL=you@company.com
   JIRA_API_TOKEN=...
-  Optional: JIRA_JQL=project = ABC ORDER BY updated DESC
+  Optional: JIRA_JQL=updated >= -365d ORDER BY updated DESC
   Optional: JIRA_MAX_ISSUES=500
 
 Google Drive:
@@ -200,6 +220,19 @@ Google Drive:
   Or: GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET + GOOGLE_REFRESH_TOKEN
   Or: GOOGLE_ACCESS_TOKEN
   Optional: GOOGLE_IMPERSONATE_USER, GOOGLE_DRIVE_MAX_FILES, GOOGLE_DRIVE_QUERY
+
+Box:
+  BOX_ACCESS_TOKEN  (developer token POC)
+  Or: BOX_CLIENT_ID + BOX_CLIENT_SECRET + BOX_ENTERPRISE_ID  (CCG)
+  Or: BOX_CLIENT_ID + BOX_CLIENT_SECRET + BOX_REFRESH_TOKEN
+  Optional: BOX_ROOT_FOLDER_ID=0, BOX_MAX_DEPTH, BOX_MAX_ITEMS
+
+Confluence Cloud:
+  CONFLUENCE_BASE_URL=https://your-domain.atlassian.net
+  CONFLUENCE_EMAIL=you@company.com
+  CONFLUENCE_API_TOKEN=...
+  Falls back to JIRA_BASE_URL / JIRA_EMAIL / JIRA_API_TOKEN on the same site
+  Optional: CONFLUENCE_MAX_PAGES, CONFLUENCE_MAX_BLOGPOSTS
 `);
 }
 

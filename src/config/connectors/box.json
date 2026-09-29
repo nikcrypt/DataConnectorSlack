@@ -1,0 +1,11 @@
+{
+  "connector": "box",
+  "objects": ["users", "folders", "files", "collaborations"],
+  "options": {
+    "downloadFileBytes": false,
+    "rootFolderId": "0",
+    "maxDepth": 5,
+    "maxItems": 2000,
+    "collaborationFolderLimit": 50
+  }
+}

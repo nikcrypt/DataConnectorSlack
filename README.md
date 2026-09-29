@@ -1,6 +1,6 @@
 # Data Connector POC (Node.js)
 
-Slack workspace extract + PostgreSQL catalog metadata + SharePoint Online + Salesforce + Jira Cloud + Google Drive, using the same shared contract (CLI → Runtime → Connector → output).
+Slack workspace extract + PostgreSQL and Oracle catalog metadata + SharePoint Online + Salesforce + Jira Cloud + Google Drive + Box + Confluence, using the same shared contract (CLI → Runtime → Connector → output).
 
 ## Connectors
 
@@ -8,10 +8,13 @@ Slack workspace extract + PostgreSQL catalog metadata + SharePoint Online + Sale
 |---|---|---|
 | **slack** | workspaces, users, channels, messages, … | `data/output/slack/*.jsonl` |
 | **postgres** | schemas, tables, views, columns | `data/output/postgres/*.jsonl` |
+| **oracle** | schemas, tables, views, columns | `data/output/oracle/*.jsonl` |
 | **sharepoint** | sites, lists, columns, listItems, drives, driveItems | `data/output/sharepoint/*.jsonl` |
 | **salesforce** | sobjects, fields, records | `data/output/salesforce/*.jsonl` |
 | **jira** | projects, issues, users, statuses, issueTypes | `data/output/jira/*.jsonl` |
 | **googledrive** | drives, files, folders, permissions | `data/output/googledrive/*.jsonl` |
+| **box** | users, folders, files, collaborations | `data/output/box/*.jsonl` |
+| **confluence** | spaces, pages, blogposts, attachments | `data/output/confluence/*.jsonl` |
 
 ---
 
@@ -178,6 +181,55 @@ Same flow as Slack:
 CLI → PostgresConnector → PostgresClient → PostgreSQL
                 ↓
         ConnectorRuntimeEngine → data/output/postgres/
+```
+
+---
+
+# Oracle Connector
+
+Extract **database metadata** from Oracle via `ALL_*` catalog views (not table row data). Uses `node-oracledb` thin mode, so Oracle Instant Client is not required.
+
+## 1. Configure `.env`
+
+```env
+ORACLE_USER=app_reader
+ORACLE_PASSWORD=your-password
+ORACLE_CONNECT_STRING=localhost:1521/XEPDB1
+# ORACLE_SCHEMAS=HR,APP
+```
+
+Or host parts instead of a connect string:
+
+```env
+ORACLE_HOST=localhost
+ORACLE_PORT=1521
+ORACLE_SERVICE_NAME=XEPDB1
+```
+
+The account needs `SELECT` on the objects you want listed (`ALL_TABLES`, `ALL_VIEWS`, `ALL_TAB_COLUMNS`, `ALL_OBJECTS`).
+
+## 2. Run
+
+```bash
+npm run test:oracle
+npm run extract:oracle
+npm run extract -- --connector oracle --objects schemas,tables,columns
+```
+
+Output: `data/output/oracle/*.jsonl`
+
+## Project layout (Oracle)
+
+```text
+connectors/oracle/OracleClient.js
+connectors/oracle/OracleConnector.js
+config/connectors/oracle.json
+```
+
+```text
+CLI → OracleConnector → OracleClient → Oracle Database
+                ↓
+        ConnectorRuntimeEngine → data/output/oracle/
 ```
 
 ---
@@ -435,4 +487,121 @@ config/connectors/googledrive.json
 CLI → GoogleDriveConnector → GoogleDriveClient → Drive API v3
                 ↓
         ConnectorRuntimeEngine → data/output/googledrive/
+```
+
+---
+
+# Box Connector
+
+Extract Box metadata (not file bytes) via Box API v2.
+
+| Object | Meaning |
+|---|---|
+| `users` | Enterprise users (falls back to current user) |
+| `folders` | Folder tree from root (BFS) |
+| `files` | File metadata under that tree |
+| `collaborations` | ACL / collab entries on sampled folders |
+
+## 1. Auth options
+
+**A. Developer token (fastest POC)**
+
+1. [Box Developer Console](https://app.box.com/developers/console) → your app → **Configuration**
+2. Generate a **Developer Token** (expires in ~60 minutes)
+3. Set `BOX_ACCESS_TOKEN`
+
+**B. Client Credentials Grant (server app)**
+
+1. Create a Custom App with **Server Authentication (Client Credentials Grant)**
+2. Authorize the app in Admin Console
+3. Set `BOX_CLIENT_ID`, `BOX_CLIENT_SECRET`, `BOX_ENTERPRISE_ID`
+
+**C. OAuth refresh token**
+
+```env
+BOX_CLIENT_ID=...
+BOX_CLIENT_SECRET=...
+BOX_REFRESH_TOKEN=...
+```
+
+## 2. Configure `.env`
+
+```env
+BOX_ACCESS_TOKEN=your-developer-token
+# BOX_ROOT_FOLDER_ID=0
+# BOX_MAX_DEPTH=5
+# BOX_MAX_ITEMS=2000
+```
+
+## 3. Run
+
+```bash
+npm run test:box
+npm run extract:box
+npm run extract -- --connector box --objects folders,files
+```
+
+Output: `data/output/box/*.jsonl`
+
+## Project layout (Box)
+
+```text
+connectors/box/BoxClient.js
+connectors/box/BoxConnector.js
+config/connectors/box.json
+```
+
+```text
+CLI → BoxConnector → BoxClient → Box API v2
+                ↓
+        ConnectorRuntimeEngine → data/output/box/
+```
+
+---
+
+# Confluence Connector
+
+Extract Confluence Cloud spaces, pages, blog posts, and attachment metadata via REST API v2.
+
+| Object | Meaning |
+|---|---|
+| `spaces` | Confluence spaces |
+| `pages` | Pages plus a plain-text body excerpt |
+| `blogposts` | Blog posts plus a plain-text body excerpt |
+| `attachments` | Attachment metadata for a limited set of pages (no file bytes) |
+
+Auth is the same Atlassian email + API token as Jira. If `CONFLUENCE_*` is unset, the connector reuses `JIRA_BASE_URL`, `JIRA_EMAIL`, and `JIRA_API_TOKEN`.
+
+## 1. Configure `.env`
+
+```env
+CONFLUENCE_BASE_URL=https://your-domain.atlassian.net
+CONFLUENCE_EMAIL=you@company.com
+CONFLUENCE_API_TOKEN=your-api-token
+# CONFLUENCE_MAX_PAGES=500
+# CONFLUENCE_MAX_BLOGPOSTS=200
+```
+
+## 2. Run
+
+```bash
+npm run test:confluence
+npm run extract:confluence
+npm run extract -- --connector confluence --objects spaces,pages
+```
+
+Output: `data/output/confluence/*.jsonl`
+
+## Project layout (Confluence)
+
+```text
+connectors/confluence/ConfluenceClient.js
+connectors/confluence/ConfluenceConnector.js
+config/connectors/confluence.json
+```
+
+```text
+CLI → ConfluenceConnector → ConfluenceClient → Confluence Cloud REST API v2
+                ↓
+        ConnectorRuntimeEngine → data/output/confluence/
 ```
