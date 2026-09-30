@@ -3,6 +3,6 @@
   "objects": ["sobjects", "fields", "records"],
   "options": {
     "defaultSObjects": ["Account", "Contact", "Opportunity"],
-    "recordLimit": 200
+    "recordLimit": 10000
   }
 }

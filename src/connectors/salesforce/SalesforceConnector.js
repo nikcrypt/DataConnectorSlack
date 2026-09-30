@@ -24,7 +24,7 @@ export class SalesforceConnector extends DataConnector {
     this.sobjectNames = config.sobjectNames?.length
       ? config.sobjectNames
       : ["Account", "Contact", "Opportunity"];
-    this.recordLimit = config.recordLimit ?? 200;
+    this.recordLimit = config.recordLimit ?? 10000;
   }
 
   static fromEnv() {
@@ -34,7 +34,7 @@ export class SalesforceConnector extends DataConnector {
 
     const recordLimit = process.env.SALESFORCE_RECORD_LIMIT
       ? Number(process.env.SALESFORCE_RECORD_LIMIT)
-      : 200;
+      : 10000;
 
     return new SalesforceConnector({
       client: SalesforceClient.fromEnv(),
@@ -144,6 +144,7 @@ export class SalesforceConnector extends DataConnector {
         // Keep SOQL manageable for POC — Id + up to 25 fields
         const selected = ["Id", ...fieldNames.filter((f) => f !== "Id")].slice(0, 26);
         const soql = `SELECT ${selected.join(", ")} FROM ${name} LIMIT ${this.recordLimit}`;
+        let count = 0;
 
         for await (const row of this.client.query(soql)) {
           const { attributes, Id, ...rest } = row;
@@ -158,6 +159,8 @@ export class SalesforceConnector extends DataConnector {
             },
             row
           );
+          count += 1;
+          if (count >= this.recordLimit) break;
         }
       } catch (err) {
         console.warn(`[salesforce] records skipped for ${name}:`, err.message);

@@ -307,7 +307,7 @@ Extract Salesforce metadata and records via the REST API using a Connected App.
 |---|---|
 | `sobjects` | Catalog of Salesforce objects |
 | `fields` | Field describe for configured objects |
-| `records` | SOQL rows for configured objects (default limit 200 each) |
+| `records` | SOQL rows for configured objects (up to 10,000 each) |
 
 ## 1. Connected App setup
 
@@ -334,7 +334,7 @@ SALESFORCE_SECURITY_TOKEN=your-security-token
 
 # Which objects to describe/query:
 SALESFORCE_OBJECTS=Account,Contact,Opportunity
-SALESFORCE_RECORD_LIMIT=200
+SALESFORCE_RECORD_LIMIT=10000
 ```
 
 If `USERNAME`/`PASSWORD` are omitted, the connector tries **client_credentials**.
