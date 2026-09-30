@@ -16,9 +16,9 @@ export async function loginGoogleDrive({ clientId, clientSecret, redirectUri, sc
   const state = randomBytes(16).toString("hex");
 
   const authUrl = new URL("https://accounts.google.com/o/oauth2/v2/auth");
+  authUrl.searchParams.set("response_type", "code");
   authUrl.searchParams.set("client_id", clientId);
   authUrl.searchParams.set("redirect_uri", redirectUri);
-  authUrl.searchParams.set("response_type", "code");
   authUrl.searchParams.set("scope", scope);
   authUrl.searchParams.set("access_type", "offline");
   authUrl.searchParams.set("prompt", "consent");
@@ -53,6 +53,18 @@ function waitForCallback({ port, callbackPath, redirectUri, state, authUrl, clie
     const server = http.createServer(async (req, res) => {
       try {
         const url = new URL(req.url, redirectUri);
+        if (url.pathname === "/" || url.pathname === "/google/login") {
+          res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+          res.end(`<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>Google Drive sign-in</title></head>
+<body style="font-family: sans-serif; max-width: 640px; margin: 48px auto;">
+  <h1>Sign in to Google Drive</h1>
+  <p><a href="${escapeHtml(authUrl)}">Continue to Google</a></p>
+</body>
+</html>`);
+          return;
+        }
         if (url.pathname !== callbackPath) {
           res.writeHead(404, { "Content-Type": "text/plain" });
           res.end("Not found");
@@ -101,11 +113,12 @@ function waitForCallback({ port, callbackPath, redirectUri, state, authUrl, clie
     }, 3 * 60 * 1000);
 
     server.on("error", (err) => finish(reject, err));
-    server.listen(port, "127.0.0.1", () => {
-      console.log("\nGoogle Drive needs a sign-in. Open this URL if the browser does not:");
-      console.log(authUrl);
+    server.listen(port, "0.0.0.0", () => {
+      const loginPage = `http://localhost:${port}/`;
+      console.log("\nGoogle Drive needs a sign-in. Open this page and click Continue to Google:");
+      console.log(loginPage);
       console.log("");
-      openBrowser(authUrl);
+      openBrowser(loginPage);
     });
   });
 }
