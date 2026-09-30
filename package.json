@@ -7,6 +7,7 @@
   "scripts": {
     "auth": "node src/auth-server.js",
     "auth:status": "node src/cli.js auth-status",
+    "auth:googledrive": "node src/connectors/googledrive/loginCli.js",
     "test:connection": "node src/cli.js test",
     "test:slack": "node src/cli.js test --connector slack",
     "test:postgres": "node src/cli.js test --connector postgres",

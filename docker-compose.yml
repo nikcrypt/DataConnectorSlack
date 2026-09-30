@@ -1,0 +1,12 @@
+services:
+  connectors:
+    build: .
+    image: data-connector-app-poc
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+      - ./certs:/app/certs:ro
+    ports:
+      - "3000:3000"
+    command: ["node", "src/cli.js", "help"]

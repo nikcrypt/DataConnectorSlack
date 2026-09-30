@@ -86,44 +86,6 @@ function createConnector(name) {
   }
 }
 
-function defaultObjects(connectorKey) {
-  if (connectorKey === "postgres" || connectorKey === "oracle") {
-    return ["schemas", "tables", "views", "columns"];
-  }
-  if (connectorKey === "sharepoint") {
-    return ["sites", "lists", "columns", "listItems", "drives", "driveItems"];
-  }
-  if (connectorKey === "salesforce") {
-    return ["sobjects", "fields", "records"];
-  }
-  if (connectorKey === "jira") {
-    return ["projects", "issues", "users", "statuses", "issueTypes"];
-  }
-  if (
-    connectorKey === "googledrive" ||
-    connectorKey === "google-drive" ||
-    connectorKey === "gdrive"
-  ) {
-    return ["drives", "files", "folders", "permissions"];
-  }
-  if (connectorKey === "box") {
-    return ["users", "folders", "files", "collaborations"];
-  }
-  if (connectorKey === "confluence") {
-    return ["spaces", "pages", "blogposts", "attachments"];
-  }
-  return [
-    "workspaces",
-    "users",
-    "userGroups",
-    "channels",
-    "messages",
-    "threads",
-    "reactions",
-    "files",
-  ];
-}
-
 async function main() {
   const args = parseArgs(process.argv);
 
@@ -172,7 +134,18 @@ async function main() {
 
   if (args.command === "extract") {
     const runtime = new ConnectorRuntimeEngine(connector);
-    const objects = args.objects || defaultObjects(args.connector);
+    const objects = args.objects || connector.getObjects();
+    const known = new Set(connector.getObjects());
+    const unknown = objects.filter((object) => !known.has(object));
+    if (unknown.length) {
+      throw new Error(
+        `Unknown ${connector.getConnectorKey()} object: ${unknown.join(", ")}. ` +
+          `Valid objects: ${connector.getObjects().join(", ")}`
+      );
+    }
+    console.log(
+      `[runtime] ${connector.getConnectorKey()} objects: ${objects.join(", ")}`
+    );
     await runtime.run({ objects, mode: "full" });
     return;
   }

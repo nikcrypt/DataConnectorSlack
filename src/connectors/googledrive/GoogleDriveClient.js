@@ -8,6 +8,8 @@
 import { createSign } from "node:crypto";
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import { loadGoogleAuth, saveGoogleAuth } from "./tokenStore.js";
+import { loginGoogleDrive } from "./googleLogin.js";
 
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const DRIVE_BASE = "https://www.googleapis.com/drive/v3";
@@ -55,19 +57,24 @@ export class GoogleDriveClient {
     this.clientSecret = config.clientSecret || null;
     this.refreshToken = config.refreshToken || null;
     this.scope = config.scope || DEFAULT_SCOPE;
+    this.redirectUri =
+      config.redirectUri || "http://localhost:3000/oauth2callback";
     this.tokenExpiresAt = 0;
+    this.loadedStored = false;
+    this.loginAttempted = false;
 
     const hasSa = Boolean(this.serviceAccountFile);
     const hasRefresh =
       Boolean(this.clientId) &&
       Boolean(this.clientSecret) &&
       Boolean(this.refreshToken);
+    const hasOAuthClient = Boolean(this.clientId) && Boolean(this.clientSecret);
     const hasBearer = Boolean(this.accessToken);
 
-    if (!hasSa && !hasRefresh && !hasBearer) {
+    if (!hasSa && !hasRefresh && !hasBearer && !hasOAuthClient) {
       throw new Error(
         "Missing Google Drive auth. Set GOOGLE_SERVICE_ACCOUNT_FILE, " +
-          "or GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET + GOOGLE_REFRESH_TOKEN, " +
+          "or GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET (login opens when the token is missing), " +
           "or GOOGLE_ACCESS_TOKEN."
       );
     }
@@ -84,21 +91,48 @@ export class GoogleDriveClient {
       clientId: process.env.GOOGLE_CLIENT_ID || null,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET || null,
       refreshToken: process.env.GOOGLE_REFRESH_TOKEN || null,
-      scope: process.env.GOOGLE_DRIVE_SCOPE || DEFAULT_SCOPE,
+      scope: process.env.GOOGLE_DRIVE_SCOPE || process.env.TOKEN_SCOPE || DEFAULT_SCOPE,
+      redirectUri:
+        process.env.GOOGLE_REDIRECT_URI ||
+        `http://localhost:${process.env.PORT || 3000}/oauth2callback`,
     });
   }
 
-  async authenticate() {
-    if (this.accessToken && Date.now() < this.tokenExpiresAt - 60_000) {
-      return this.accessToken;
+  async loadStoredTokens() {
+    if (this.loadedStored) return;
+    this.loadedStored = true;
+    const stored = await loadGoogleAuth();
+    if (!stored) return;
+    if (stored.refreshToken) this.refreshToken = stored.refreshToken;
+    if (stored.accessToken && stored.expiresAt > Date.now() + 60_000) {
+      this.accessToken = stored.accessToken;
+      this.tokenExpiresAt = stored.expiresAt;
     }
+  }
 
-    // Explicit bearer from env — no refresh
-    if (
-      this.accessToken &&
-      !this.serviceAccountFile &&
-      !this.refreshToken
-    ) {
+  async login() {
+    if (!this.clientId || !this.clientSecret) {
+      throw new Error(
+        "Cannot open Google login. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET."
+      );
+    }
+    const tokens = await loginGoogleDrive({
+      clientId: this.clientId,
+      clientSecret: this.clientSecret,
+      redirectUri: this.redirectUri,
+      scope: this.scope,
+    });
+    this.accessToken = tokens.accessToken;
+    if (tokens.refreshToken) this.refreshToken = tokens.refreshToken;
+    this.tokenExpiresAt = tokens.expiresAt;
+    this.loginAttempted = true;
+    return tokens;
+  }
+
+  async authenticate() {
+    await this.loadStoredTokens();
+
+    if (this.accessToken && Date.now() < this.tokenExpiresAt - 60_000) {
       return this.accessToken;
     }
 
@@ -106,11 +140,31 @@ export class GoogleDriveClient {
       return this.authenticateServiceAccount();
     }
 
-    if (this.refreshToken) {
-      return this.authenticateRefreshToken();
+    if (this.refreshToken && this.clientId && this.clientSecret) {
+      try {
+        return await this.authenticateRefreshToken();
+      } catch (err) {
+        if (!this.canInteractiveLogin() || this.loginAttempted) throw err;
+        console.warn(`[googledrive] ${err.message}`);
+        await this.login();
+        return this.accessToken;
+      }
     }
 
-    return this.accessToken;
+    if (this.canInteractiveLogin() && !this.loginAttempted) {
+      await this.login();
+      return this.accessToken;
+    }
+
+    if (this.accessToken) return this.accessToken;
+
+    throw new Error(
+      "Google Drive is not signed in. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET, then run npm run auth:googledrive."
+    );
+  }
+
+  canInteractiveLogin() {
+    return Boolean(this.clientId && this.clientSecret && !this.serviceAccountFile);
   }
 
   async authenticateServiceAccount() {
@@ -184,12 +238,19 @@ export class GoogleDriveClient {
     const data = await response.json();
     if (!response.ok || !data.access_token) {
       throw new Error(
-        `Google refresh auth failed: ${data.error_description || data.error || response.status}`
+        `Google refresh auth failed: ${data.error || ""} ${data.error_description || response.status}`.trim()
       );
     }
 
     this.accessToken = data.access_token;
     this.tokenExpiresAt = Date.now() + (data.expires_in || 3600) * 1000;
+    if (data.refresh_token) this.refreshToken = data.refresh_token;
+    await saveGoogleAuth({
+      accessToken: this.accessToken,
+      refreshToken: this.refreshToken,
+      scope: this.scope,
+      expiresAt: this.tokenExpiresAt,
+    });
     return this.accessToken;
   }
 
@@ -226,6 +287,7 @@ export class GoogleDriveClient {
 
       if (response.status === 401 && attempt === 0) {
         this.tokenExpiresAt = 0;
+        this.accessToken = null;
         await this.authenticate();
         attempt += 1;
         continue;

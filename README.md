@@ -2,6 +2,8 @@
 
 Slack workspace extract + PostgreSQL and Oracle catalog metadata + SharePoint Online + Salesforce + Jira Cloud + Google Drive + Box + Confluence, using the same shared contract (CLI → Runtime → Connector → output).
 
+QA can run every connector from one container. See [docs/qa-docker.md](docs/qa-docker.md). Splitting one container per connector is the later platform step.
+
 ## Connectors
 
 | Connector | Objects | Output |
@@ -439,15 +441,23 @@ Extract Drive metadata (not file bytes) via Drive API v3.
 3. Share the Drive folders/files you want with the service account email (`...@....iam.gserviceaccount.com`), **Viewer**
 4. (Workspace only) For full user Drive access without sharing each folder: enable domain-wide delegation and set `GOOGLE_IMPERSONATE_USER`
 
-**B. OAuth refresh token**
+**B. OAuth (browser sign-in)**
 
-Create an OAuth client (Desktop or Web), complete consent once, store refresh token:
+Set the OAuth client and the redirect URL registered on that client:
 
 ```env
 GOOGLE_CLIENT_ID=...
 GOOGLE_CLIENT_SECRET=...
-GOOGLE_REFRESH_TOKEN=...
+GOOGLE_REDIRECT_URI=http://localhost:3000/oauth2callback
 ```
+
+When the access token or refresh token is expired, `npm run test:googledrive` opens Google's login screen, stores a new refresh token in `data/google-auth.json`, and retries. You can also sign in first:
+
+```bash
+npm run auth:googledrive
+```
+
+On a VM, publish port 3000 and open the printed URL in a browser on your laptop. `http://localhost:3000/oauth2callback` must be an authorized redirect URI on the Google OAuth client.
 
 **C. Short-lived bearer**
 

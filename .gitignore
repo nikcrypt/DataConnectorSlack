@@ -5,6 +5,7 @@ node_modules/
 data/output/
 data/bench/
 data/slack-auth.json
+data/google-auth.json
 certs/
 *.key
 *.pem
