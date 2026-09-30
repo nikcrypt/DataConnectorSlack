@@ -1,0 +1,8 @@
+{
+  "connector": "mysql",
+  "objects": ["schemas", "tables", "views", "columns"],
+  "options": {
+    "excludeSystemSchemas": true,
+    "extractRowData": false
+  }
+}

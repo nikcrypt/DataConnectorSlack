@@ -1,6 +1,6 @@
 # Data Connector POC (Node.js)
 
-Slack workspace extract + PostgreSQL and Oracle catalog metadata + SharePoint Online + Salesforce + Jira Cloud + Google Drive + Box + Confluence, using the same shared contract (CLI → Runtime → Connector → output).
+Slack workspace extract + PostgreSQL, MySQL, and Oracle catalog metadata + SharePoint Online + Salesforce + Jira Cloud + Google Drive + Box + Confluence, using the same shared contract (CLI → Runtime → Connector → output).
 
 QA can run every connector from one container. See [docs/qa-docker.md](docs/qa-docker.md). Splitting one container per connector is the later platform step.
 
@@ -10,6 +10,7 @@ QA can run every connector from one container. See [docs/qa-docker.md](docs/qa-d
 |---|---|---|
 | **slack** | workspaces, users, channels, messages, … | `data/output/slack/*.jsonl` |
 | **postgres** | schemas, tables, views, columns | `data/output/postgres/*.jsonl` |
+| **mysql** | schemas, tables, views, columns | `data/output/mysql/*.jsonl` |
 | **oracle** | schemas, tables, views, columns | `data/output/oracle/*.jsonl` |
 | **sharepoint** | sites, lists, columns, listItems, drives, driveItems | `data/output/sharepoint/*.jsonl` |
 | **salesforce** | sobjects, fields, records | `data/output/salesforce/*.jsonl` |
@@ -232,6 +233,54 @@ config/connectors/oracle.json
 CLI → OracleConnector → OracleClient → Oracle Database
                 ↓
         ConnectorRuntimeEngine → data/output/oracle/
+```
+
+---
+
+# MySQL Connector
+
+Extract **database metadata** from MySQL via `information_schema` (not table row data). System schemas `mysql`, `information_schema`, `performance_schema`, and `sys` are skipped unless you list them in `MYSQL_SCHEMAS`.
+
+## 1. Configure `.env`
+
+```env
+MYSQL_HOST=localhost
+MYSQL_PORT=3306
+MYSQL_DATABASE=appdb
+MYSQL_USER=connector_reader
+MYSQL_PASSWORD=your-password
+MYSQL_SSL=false
+# MYSQL_SCHEMAS=appdb
+```
+
+Or a URL:
+
+```env
+MYSQL_URL=mysql://connector_reader:password@localhost:3306/appdb
+```
+
+## 2. Run
+
+```bash
+npm run test:mysql
+npm run extract:mysql
+npm run extract -- --connector mysql --objects schemas,tables,columns
+```
+
+Output: `data/output/mysql/*.jsonl`
+
+## Project layout (MySQL)
+
+```text
+connectors/mysql/MysqlClient.js
+connectors/mysql/MysqlConnector.js
+config/connectors/mysql.json
+```
+
+```text
+CLI → MysqlConnector → MysqlClient → MySQL
+                ↓
+        ConnectorRuntimeEngine → data/output/mysql/
 ```
 
 ---

@@ -8,6 +8,7 @@ import { GoogleDriveConnector } from "./connectors/googledrive/GoogleDriveConnec
 import { BoxConnector } from "./connectors/box/BoxConnector.js";
 import { ConfluenceConnector } from "./connectors/confluence/ConfluenceConnector.js";
 import { OracleConnector } from "./connectors/oracle/OracleConnector.js";
+import { MysqlConnector } from "./connectors/mysql/MysqlConnector.js";
 import { ConnectorRuntimeEngine } from "./runtime/ConnectorRuntimeEngine.js";
 import { loadSlackAuth, getBotTokenFromEnvOrAuth } from "./connectors/slack/tokenStore.js";
 
@@ -79,9 +80,11 @@ function createConnector(name) {
       return Promise.resolve(ConfluenceConnector.fromEnv());
     case "oracle":
       return Promise.resolve(OracleConnector.fromEnv());
+    case "mysql":
+      return Promise.resolve(MysqlConnector.fromEnv());
     default:
       throw new Error(
-        `Unknown connector: ${name}. Use slack, postgres, sharepoint, salesforce, jira, googledrive, box, confluence, or oracle.`
+        `Unknown connector: ${name}. Use slack, postgres, mysql, sharepoint, salesforce, jira, googledrive, box, confluence, or oracle.`
       );
   }
 }
@@ -159,16 +162,20 @@ function printHelp() {
   console.log(`
 Data connector CLI
 
-  npm run test:connection -- --connector slack|postgres|oracle|sharepoint|salesforce|jira|googledrive|box|confluence
-  npm run extract -- --connector oracle
-  npm run extract -- --connector oracle --objects schemas,tables,columns
-  npm run extract:slack | extract:postgres | extract:oracle | extract:sharepoint | extract:salesforce | extract:jira | extract:googledrive | extract:box | extract:confluence
+  npm run test:connection -- --connector slack|postgres|mysql|oracle|sharepoint|salesforce|jira|googledrive|box|confluence
+  npm run extract -- --connector mysql
+  npm run extract -- --connector mysql --objects schemas,tables,columns
+  npm run extract:slack | extract:postgres | extract:mysql | extract:oracle | extract:sharepoint | extract:salesforce | extract:jira | extract:googledrive | extract:box | extract:confluence
 
 Slack:
   SLACK_BOT_TOKEN
 
 Postgres:
   POSTGRES_URL or HOST/DATABASE/USER/PASSWORD
+
+MySQL:
+  MYSQL_URL or HOST/USER/PASSWORD
+  Optional: MYSQL_DATABASE, MYSQL_PORT, MYSQL_SSL, MYSQL_SCHEMAS
 
 Oracle:
   ORACLE_USER + ORACLE_PASSWORD + ORACLE_CONNECT_STRING
