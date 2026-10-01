@@ -196,6 +196,7 @@ export class SalesforceClient {
         headers: {
           Authorization: `Bearer ${this.accessToken}`,
           Accept: "application/json",
+          ...(options.headers || {}),
         },
       });
 
@@ -273,14 +274,21 @@ export class SalesforceClient {
    * @param {string} soql
    */
   async *query(soql) {
-    let data = await this.request("/query", { query: { q: soql } });
+    const headers = { "Sforce-Query-Options": "batchSize=2000" };
+    let data = await this.request("/query", { query: { q: soql }, headers });
+    let page = 1;
 
     while (true) {
-      for (const record of data.records || []) {
+      const batch = data.records || [];
+      console.log(
+        `[salesforce] query page ${page}: ${batch.length} rows, totalSize=${data.totalSize ?? "?"}, done=${Boolean(data.done)}`
+      );
+      for (const record of batch) {
         yield record;
       }
       if (data.done || !data.nextRecordsUrl) break;
-      data = await this.request(data.nextRecordsUrl);
+      page += 1;
+      data = await this.request(data.nextRecordsUrl, { headers });
     }
   }
 }

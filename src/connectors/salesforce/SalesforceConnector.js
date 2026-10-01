@@ -129,6 +129,10 @@ export class SalesforceConnector extends DataConnector {
   }
 
   async *extractRecords() {
+    console.log(
+      `[salesforce] record limit per object: ${this.recordLimit} (SALESFORCE_RECORD_LIMIT)`
+    );
+
     for (const name of this.sobjectNames) {
       try {
         const describe = await this.client.describeSObject(name);
@@ -137,34 +141,48 @@ export class SalesforceConnector extends DataConnector {
           continue;
         }
 
-        const fieldNames = (describe.fields || [])
-          .map((f) => f.name)
-          .filter(Boolean);
-
-        // Keep SOQL manageable for POC — Id + up to 25 fields
-        const selected = ["Id", ...fieldNames.filter((f) => f !== "Id")].slice(0, 26);
-        const soql = `SELECT ${selected.join(", ")} FROM ${name} LIMIT ${this.recordLimit}`;
-        let count = 0;
-
-        for await (const row of this.client.query(soql)) {
-          const { attributes, Id, ...rest } = row;
-          yield this.record(
-            "records",
-            `${name}:${Id || row.Id}`,
-            {
-              sobject: name,
-              id: Id || row.Id || null,
-              fields: { Id: Id || row.Id, ...rest },
-              type: attributes?.type || name,
-            },
-            row
+        const selected = selectableFieldNames(describe.fields);
+        const progress = { count: 0 };
+        try {
+          yield* this.extractObjectRecords(name, selected, progress);
+        } catch (err) {
+          if (progress.count > 0) {
+            console.warn(
+              `[salesforce] ${name} stopped after ${progress.count} records: ${err.message}`
+            );
+            continue;
+          }
+          console.warn(
+            `[salesforce] ${name} query failed, retrying with Id and Name: ${err.message}`
           );
-          count += 1;
-          if (count >= this.recordLimit) break;
+          yield* this.extractObjectRecords(name, ["Id", "Name"], progress);
         }
+        console.log(`[salesforce] ${name}: fetched ${progress.count} records`);
       } catch (err) {
         console.warn(`[salesforce] records skipped for ${name}:`, err.message);
       }
+    }
+  }
+
+  async *extractObjectRecords(name, fieldNames, progress) {
+    const selected = ["Id", ...fieldNames.filter((field) => field !== "Id")];
+    const soql = `SELECT ${selected.join(", ")} FROM ${name} LIMIT ${this.recordLimit}`;
+
+    for await (const row of this.client.query(soql)) {
+      const { attributes, Id, ...rest } = row;
+      yield this.record(
+        "records",
+        `${name}:${Id || row.Id}`,
+        {
+          sobject: name,
+          id: Id || row.Id || null,
+          fields: { Id: Id || row.Id, ...rest },
+          type: attributes?.type || name,
+        },
+        row
+      );
+      progress.count += 1;
+      if (progress.count >= this.recordLimit) return;
     }
   }
 
@@ -181,4 +199,18 @@ export class SalesforceConnector extends DataConnector {
     payload.hash = createHash("sha256").update(JSON.stringify(data)).digest("hex");
     return payload;
   }
+}
+
+const SKIP_FIELD_TYPES = new Set(["address", "location", "base64", "anytype"]);
+
+/** Compound fields such as BillingAddress cannot appear in SOQL and fail the whole query. */
+function selectableFieldNames(fields) {
+  const names = [];
+  for (const field of fields || []) {
+    if (!field?.name || field.name === "Id") continue;
+    if (field.queryable === false) continue;
+    if (SKIP_FIELD_TYPES.has(String(field.type || "").toLowerCase())) continue;
+    names.push(field.name);
+  }
+  return names;
 }

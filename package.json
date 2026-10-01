@@ -21,6 +21,7 @@
     "test:confluence": "node src/cli.js test --connector confluence",
     "extract": "node src/cli.js extract",
     "extract:slack": "node src/cli.js extract --connector slack",
+    "extract:slack:mongo": "node src/cli.js extract-mongo --connector slack",
     "extract:postgres": "node src/cli.js extract --connector postgres",
     "extract:mysql": "node src/cli.js extract --connector mysql",
     "extract:oracle": "node src/cli.js extract --connector oracle",
@@ -40,6 +41,7 @@
   },
   "dependencies": {
     "dotenv": "^16.4.7",
+    "mongodb": "^6.21.0",
     "mysql2": "^3.24.5",
     "oracledb": "^6.10.0",
     "pg": "^8.13.1"

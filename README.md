@@ -96,6 +96,13 @@ npm run extract:slack -- --objects users,channels
 
 Output: `data/output/*.jsonl`
 
+To save the same Slack extract into MongoDB (`records` and `extraction_runs` in the database named by `MONGO_URL`):
+
+```bash
+npm run extract:slack:mongo
+npm run extract:slack:mongo -- --objects users,channels
+```
+
 ## Project layout
 
 ```text
@@ -106,7 +113,8 @@ src/
   connectors/slack/tokenStore.js
   connectors/slack/SlackClient.js
   connectors/slack/SlackConnector.js
-  runtime/ConnectorRuntimeEngine.js
+  runtime/ConnectorRuntimeEngine.js   JSONL writer
+  runtime/SlackMongoRuntime.js       Slack records -> MongoDB
 ```
 
 ## What auth details are used for
