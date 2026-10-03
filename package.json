@@ -28,6 +28,7 @@
     "extract:sharepoint": "node src/cli.js extract --connector sharepoint",
     "extract:salesforce": "node src/cli.js extract --connector salesforce",
     "extract:jira": "node src/cli.js extract --connector jira",
+    "extract:jira:mongo": "node src/cli.js extract-mongo --connector jira",
     "extract:googledrive": "node src/cli.js extract --connector googledrive",
     "extract:box": "node src/cli.js extract --connector box",
     "extract:confluence": "node src/cli.js extract --connector confluence",

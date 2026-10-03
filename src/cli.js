@@ -155,9 +155,9 @@ async function main() {
   }
 
   if (args.command === "extract-mongo") {
-    if (args.connector !== "slack") {
+    if (args.connector !== "slack" && args.connector !== "jira") {
       throw new Error(
-        "MongoDB extract is only implemented for Slack. Run: npm run extract:slack:mongo"
+        "MongoDB extract is only implemented for Slack and Jira. Run: npm run extract:slack:mongo or npm run extract:jira:mongo"
       );
     }
     const objects = args.objects || connector.getObjects();
@@ -165,10 +165,10 @@ async function main() {
     const unknown = objects.filter((object) => !known.has(object));
     if (unknown.length) {
       throw new Error(
-        `Unknown slack object: ${unknown.join(", ")}. Valid objects: ${connector.getObjects().join(", ")}`
+        `Unknown ${args.connector} object: ${unknown.join(", ")}. Valid objects: ${connector.getObjects().join(", ")}`
       );
     }
-    console.log(`[mongo] slack objects: ${objects.join(", ")}`);
+    console.log(`[mongo] ${args.connector} objects: ${objects.join(", ")}`);
     const runtime = new SlackMongoRuntime(connector);
     const summary = await runtime.run({ objects, mode: "full" });
     console.log(`[mongo] run ${summary.runId} ${summary.status}`);
@@ -189,10 +189,11 @@ Data connector CLI
   npm run extract -- --connector mysql --objects schemas,tables,columns
   npm run extract:slack | extract:postgres | extract:mysql | extract:oracle | extract:sharepoint | extract:salesforce | extract:jira | extract:googledrive | extract:box | extract:confluence
   npm run extract:slack:mongo
+  npm run extract:jira:mongo
 
 Slack:
   SLACK_BOT_TOKEN
-  MONGO_URL   (only for extract:slack:mongo)
+  MONGO_URL   (extract:slack:mongo and extract:jira:mongo)
 
 Postgres:
   POSTGRES_URL or HOST/DATABASE/USER/PASSWORD

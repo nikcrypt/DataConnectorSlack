@@ -96,11 +96,12 @@ npm run extract:slack -- --objects users,channels
 
 Output: `data/output/*.jsonl`
 
-To save the same Slack extract into MongoDB (`records` and `extraction_runs` in the database named by `MONGO_URL`):
+To save the Slack or Jira extract into MongoDB (`records` and `extraction_runs` in the database named by `MONGO_URL`):
 
 ```bash
 npm run extract:slack:mongo
 npm run extract:slack:mongo -- --objects users,channels
+npm run extract:jira:mongo
 ```
 
 ## Project layout
@@ -114,7 +115,7 @@ src/
   connectors/slack/SlackClient.js
   connectors/slack/SlackConnector.js
   runtime/ConnectorRuntimeEngine.js   JSONL writer
-  runtime/SlackMongoRuntime.js       Slack records -> MongoDB
+  runtime/SlackMongoRuntime.js       Slack and Jira records -> MongoDB
 ```
 
 ## What auth details are used for
@@ -458,9 +459,10 @@ JIRA_API_TOKEN=your-api-token
 npm run test:jira
 npm run extract:jira
 npm run extract -- --connector jira --objects projects,issues
+npm run extract:jira:mongo
 ```
 
-Output: `data/output/jira/*.jsonl`
+File output: `data/output/jira/*.jsonl`. `extract:jira:mongo` writes the same records to MongoDB.
 
 ## Project layout (Jira)
 

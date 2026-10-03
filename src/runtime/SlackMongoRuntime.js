@@ -3,9 +3,11 @@ import { MongoClient } from "mongodb";
 
 const BATCH_SIZE = 200;
 
+const MONGO_CONNECTORS = new Set(["slack", "jira"]);
+
 /**
- * Slack-only sink. Upserts extracted records into MongoDB.
- * Unique key: connectorKey + object + sourceId.
+ * Upserts extracted records into MongoDB.
+ * Enabled for Slack and Jira. Unique key: connectorKey + object + sourceId.
  */
 export class SlackMongoRuntime {
   /**
@@ -17,10 +19,12 @@ export class SlackMongoRuntime {
     if (!uri) {
       throw new Error("Missing MONGO_URL. Set it in .env");
     }
-    if (connector.getConnectorKey?.() !== "slack") {
-      throw new Error("MongoDB extract is only implemented for Slack");
+    const connectorKey = connector.getConnectorKey?.();
+    if (!MONGO_CONNECTORS.has(connectorKey)) {
+      throw new Error("MongoDB extract is only implemented for Slack and Jira");
     }
     this.connector = connector;
+    this.connectorKey = connectorKey;
     this.uri = uri;
     this.batchSize = options.batchSize || BATCH_SIZE;
   }
@@ -32,7 +36,7 @@ export class SlackMongoRuntime {
     const startedAt = new Date();
     const summary = {
       runId,
-      connector: "slack",
+      connector: this.connectorKey,
       mode,
       startedAt: startedAt.toISOString(),
       objects: {},
@@ -55,14 +59,14 @@ export class SlackMongoRuntime {
 
       await runs.insertOne({
         runId,
-        connectorKey: "slack",
+        connectorKey: this.connectorKey,
         status: "running",
         mode,
         startedAt,
         objects: {},
       });
 
-      console.log(`[mongo] slack run ${runId} -> ${db.databaseName}.records`);
+      console.log(`[mongo] ${this.connectorKey} run ${runId} -> ${db.databaseName}.records`);
 
       try {
         for (const object of selected) {
