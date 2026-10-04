@@ -1,6 +1,6 @@
 # Data Connector POC (Node.js)
 
-Slack workspace extract + PostgreSQL, MySQL, and Oracle catalog metadata + SharePoint Online + Salesforce + Jira Cloud + Google Drive + Box + Confluence, using the same shared contract (CLI → Runtime → Connector → output).
+Slack workspace extract + PostgreSQL, MySQL, and Oracle catalog metadata + SharePoint Online + Salesforce + Jira Cloud + Google Drive + Box + Confluence + one Windows or SMB folder, using the same shared contract (CLI → Runtime → Connector → output).
 
 QA can run every connector from one container. See [docs/qa-docker.md](docs/qa-docker.md). Splitting one container per connector is the later platform step.
 
@@ -18,6 +18,7 @@ QA can run every connector from one container. See [docs/qa-docker.md](docs/qa-d
 | **googledrive** | drives, files, folders, permissions | `data/output/googledrive/*.jsonl` |
 | **box** | users, folders, files, collaborations | `data/output/box/*.jsonl` |
 | **confluence** | spaces, pages, blogposts, attachments | `data/output/confluence/*.jsonl` |
+| **windows** | folders, files | `data/output/windows/*.jsonl` and `data/output/windows/downloads/` |
 
 ---
 
@@ -674,3 +675,29 @@ CLI → ConfluenceConnector → ConfluenceClient → Confluence Cloud REST API v
                 ↓
         ConnectorRuntimeEngine → data/output/confluence/
 ```
+
+---
+
+# Windows folder
+
+Reads one folder URL. It does not read a whole drive or an admin share such as `C$`.
+
+```env
+WINDOWS_FOLDER_URL=smb://fileserver/team/reports
+WINDOWS_USERNAME=reader
+WINDOWS_PASSWORD=your-password
+WINDOWS_DOMAIN=WORKGROUP
+```
+
+A folder that is already mounted on this machine:
+
+```env
+WINDOWS_FOLDER_URL=file:///path/to/folder
+```
+
+```bash
+npm run test:windows
+npm run extract:windows
+```
+
+File records land in `data/output/windows/files.jsonl`. Files at or under 5 MB are copied to `data/output/windows/downloads/`. Larger files are listed and skipped.

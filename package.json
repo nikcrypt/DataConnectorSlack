@@ -1,7 +1,7 @@
 {
   "name": "data-connector-app-poc",
   "version": "1.0.0",
-  "description": "Data connector POC — Slack, PostgreSQL, MySQL, Oracle, SharePoint, Salesforce, Jira, Google Drive, Box, and Confluence extraction with Node.js",
+  "description": "Data connector POC — Slack, PostgreSQL, MySQL, Oracle, SharePoint, Salesforce, Jira, Google Drive, Box, Confluence, and Windows folder extraction with Node.js",
   "type": "module",
   "main": "src/index.js",
   "scripts": {
@@ -32,6 +32,8 @@
     "extract:googledrive": "node src/cli.js extract --connector googledrive",
     "extract:box": "node src/cli.js extract --connector box",
     "extract:confluence": "node src/cli.js extract --connector confluence",
+    "test:windows": "node src/cli.js test --connector windows",
+    "extract:windows": "node src/cli.js extract --connector windows",
     "extract:users": "node src/cli.js extract --objects users",
     "extract:channels": "node src/cli.js extract --objects channels",
     "extract:messages": "node src/cli.js extract --objects messages",
@@ -41,6 +43,7 @@
     "node": ">=18"
   },
   "dependencies": {
+    "@marsaud/smb2": "^0.16.0",
     "dotenv": "^16.4.7",
     "mongodb": "^6.21.0",
     "mysql2": "^3.24.5",

@@ -1,0 +1,10 @@
+{
+  "connector": "windows",
+  "objects": ["folders", "files"],
+  "options": {
+    "maxDepth": 5,
+    "maxFiles": 2000,
+    "maxDownloadBytes": 5242880,
+    "download": true
+  }
+}

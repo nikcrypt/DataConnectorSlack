@@ -9,6 +9,7 @@ import { BoxConnector } from "./connectors/box/BoxConnector.js";
 import { ConfluenceConnector } from "./connectors/confluence/ConfluenceConnector.js";
 import { OracleConnector } from "./connectors/oracle/OracleConnector.js";
 import { MysqlConnector } from "./connectors/mysql/MysqlConnector.js";
+import { WindowsConnector } from "./connectors/windows/WindowsConnector.js";
 import { ConnectorRuntimeEngine } from "./runtime/ConnectorRuntimeEngine.js";
 import { SlackMongoRuntime } from "./runtime/SlackMongoRuntime.js";
 import { loadSlackAuth, getBotTokenFromEnvOrAuth } from "./connectors/slack/tokenStore.js";
@@ -83,9 +84,12 @@ function createConnector(name) {
       return Promise.resolve(OracleConnector.fromEnv());
     case "mysql":
       return Promise.resolve(MysqlConnector.fromEnv());
+    case "windows":
+    case "windowsfs":
+      return Promise.resolve(WindowsConnector.fromEnv());
     default:
       throw new Error(
-        `Unknown connector: ${name}. Use slack, postgres, mysql, sharepoint, salesforce, jira, googledrive, box, confluence, or oracle.`
+        `Unknown connector: ${name}. Use slack, postgres, mysql, sharepoint, salesforce, jira, googledrive, box, confluence, oracle, or windows.`
       );
   }
 }
@@ -184,10 +188,10 @@ function printHelp() {
   console.log(`
 Data connector CLI
 
-  npm run test:connection -- --connector slack|postgres|mysql|oracle|sharepoint|salesforce|jira|googledrive|box|confluence
+  npm run test:connection -- --connector slack|postgres|mysql|oracle|sharepoint|salesforce|jira|googledrive|box|confluence|windows
   npm run extract -- --connector mysql
   npm run extract -- --connector mysql --objects schemas,tables,columns
-  npm run extract:slack | extract:postgres | extract:mysql | extract:oracle | extract:sharepoint | extract:salesforce | extract:jira | extract:googledrive | extract:box | extract:confluence
+  npm run extract:slack | extract:postgres | extract:mysql | extract:oracle | extract:sharepoint | extract:salesforce | extract:jira | extract:googledrive | extract:box | extract:confluence | extract:windows
   npm run extract:slack:mongo
   npm run extract:jira:mongo
 
@@ -238,6 +242,12 @@ Confluence Cloud:
   CONFLUENCE_API_TOKEN=...
   Falls back to JIRA_BASE_URL / JIRA_EMAIL / JIRA_API_TOKEN on the same site
   Optional: CONFLUENCE_MAX_PAGES, CONFLUENCE_MAX_BLOGPOSTS
+
+Windows folder:
+  WINDOWS_FOLDER_URL=smb://host/share/folder
+  Or: file:///path/to/mounted/folder
+  Optional: WINDOWS_USERNAME, WINDOWS_PASSWORD, WINDOWS_DOMAIN
+  Optional: WINDOWS_MAX_DEPTH, WINDOWS_MAX_FILES, WINDOWS_MAX_DOWNLOAD_BYTES
 `);
 }
 

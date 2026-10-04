@@ -32,7 +32,7 @@ docker compose run --rm connectors npm run test:jira
 docker compose run --rm connectors npm run extract:jira
 ```
 
-Replace `jira` with `slack`, `postgres`, `oracle`, `sharepoint`, `salesforce`, `googledrive`, `box`, or `confluence`.
+Replace `jira` with `slack`, `postgres`, `mysql`, `oracle`, `sharepoint`, `salesforce`, `googledrive`, `box`, `confluence`, or `windows`.
 
 JSONL files appear on the host at `data/output/<connector>/`.
 
@@ -48,5 +48,6 @@ JSONL files appear on the host at `data/output/<connector>/`.
 | Jira / Confluence | `https://<site>.atlassian.net`, email + API token |
 | Google Drive | Service-account file under `certs/` (mounted read-only) or OAuth refresh token |
 | Box | Developer token or client credentials |
+| Windows folder | `WINDOWS_FOLDER_URL` as `smb://host/share/folder` (port 445) or a `file://` folder mounted into the container |
 
 A connector whose credentials are empty fails its own test. The others still run.
