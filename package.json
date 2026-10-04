@@ -37,7 +37,9 @@
     "extract:users": "node src/cli.js extract --objects users",
     "extract:channels": "node src/cli.js extract --objects channels",
     "extract:messages": "node src/cli.js extract --objects messages",
-    "bench:slack": "node src/bench/runSlackBench.js"
+    "bench:slack": "node src/bench/runSlackBench.js",
+    "env:encrypt": "node src/secrets/envFileCrypto.js encrypt",
+    "env:decrypt": "node src/secrets/envFileCrypto.js decrypt"
   },
   "engines": {
     "node": ">=18"

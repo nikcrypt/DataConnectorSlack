@@ -29,6 +29,15 @@ Extract Slack workspace data via OAuth-authenticated bot token.
 ## Security note
 
 App credentials (Client Secret, Signing Secret) belong only in `.env` (gitignored).
+
+Encrypt a copy when you need to store or share it. The passphrase stays in a password manager, not in the repo:
+
+```bash
+npm run env:encrypt
+npm run env:decrypt
+```
+
+Docker and the CLI still read plaintext `.env` at run time. Decrypt before `docker compose run`. The image does not contain `.env` or `.env.enc`.
 If you pasted them into chat or a screenshot, **rotate Client Secret and Signing Secret** in Slack after you finish local setup.
 
 Client ID / Secret alone cannot call data APIs. OAuth install produces the **bot token** (`xoxb-...`) the connector uses.
