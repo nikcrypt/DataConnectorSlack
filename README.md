@@ -81,10 +81,16 @@ Share the image with QA:
 docker save data-connector-app-poc -o data-connector-app-poc.tar
 ```
 
-QA installs Docker Desktop, puts the tar and a plaintext `.env` in one folder, then:
+QA installs Docker Desktop. They do not need npm or Node installed. Put the tar and `.env.enc` in one folder. Load the image, then decrypt `.env` with the script already inside the image:
 
 ```bash
 docker load -i data-connector-app-poc.tar
+docker run --rm -it -v "$PWD:/work" -w /work data-connector-app-poc node /app/src/secrets/envFileCrypto.js decrypt
+```
+
+That asks for the passphrase and writes a plaintext `.env` in the same folder. If `.env` is already there, add `--force` at the end. Then run a connector:
+
+```bash
 docker run --rm --env-file .env -v "$PWD/data:/app/data" -v "$PWD/certs:/app/certs" -p 3000:3000 data-connector-app-poc npm run test:jira
 ```
 
