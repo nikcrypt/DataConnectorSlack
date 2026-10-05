@@ -20,6 +20,76 @@ QA can run every connector from one container. See [docs/qa-docker.md](docs/qa-d
 | **confluence** | spaces, pages, blogposts, attachments | `data/output/confluence/*.jsonl` |
 | **windows** | folders, files | `data/output/windows/*.jsonl` and `data/output/windows/downloads/` |
 
+## Docker
+
+Run these from the project folder. Docker Desktop must be running. The plaintext `.env` stays in that folder. It is not copied into the image. Compose passes those values in when the container starts. The container exits when the command finishes. **Exited (0)** means it succeeded. Output is written to `data/output/<connector>/` on the machine.
+
+Build:
+
+```bash
+docker compose build
+```
+
+Test:
+
+```bash
+docker compose run --rm connectors npm run test:slack
+docker compose run --rm connectors npm run test:postgres
+docker compose run --rm connectors npm run test:mysql
+docker compose run --rm connectors npm run test:oracle
+docker compose run --rm connectors npm run test:sharepoint
+docker compose run --rm connectors npm run test:salesforce
+docker compose run --rm connectors npm run test:jira
+docker compose run --rm connectors npm run test:googledrive
+docker compose run --rm connectors npm run test:box
+docker compose run --rm connectors npm run test:confluence
+docker compose run --rm connectors npm run test:windows
+```
+
+Extract to JSONL:
+
+```bash
+docker compose run --rm connectors npm run extract:slack
+docker compose run --rm connectors npm run extract:postgres
+docker compose run --rm connectors npm run extract:mysql
+docker compose run --rm connectors npm run extract:oracle
+docker compose run --rm connectors npm run extract:sharepoint
+docker compose run --rm connectors npm run extract:salesforce
+docker compose run --rm connectors npm run extract:jira
+docker compose run --rm connectors npm run extract:googledrive
+docker compose run --rm connectors npm run extract:box
+docker compose run --rm connectors npm run extract:confluence
+docker compose run --rm connectors npm run extract:windows
+```
+
+Save Slack or Jira to MongoDB:
+
+```bash
+docker compose run --rm connectors npm run extract:slack:mongo
+docker compose run --rm connectors npm run extract:jira:mongo
+```
+
+Rebuild after code changes, then run the command again. Limit objects by appending the same flags used locally:
+
+```bash
+docker compose run --rm connectors npm run extract:jira -- --objects projects,issues
+```
+
+Share the image with QA:
+
+```bash
+docker save data-connector-app-poc -o data-connector-app-poc.tar
+```
+
+QA installs Docker Desktop, puts the tar and a plaintext `.env` in one folder, then:
+
+```bash
+docker load -i data-connector-app-poc.tar
+docker run --rm --env-file .env -v "$PWD/data:/app/data" -v "$PWD/certs:/app/certs" -p 3000:3000 data-connector-app-poc npm run test:jira
+```
+
+On Windows, use `%cd%` instead of `$PWD`. Replace `test:jira` with any `test:` or `extract:` command above.
+
 ---
 
 # Slack Connector
