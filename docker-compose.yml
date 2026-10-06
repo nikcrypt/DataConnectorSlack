@@ -4,6 +4,10 @@ services:
     image: data-connector-app-poc
     env_file:
       - .env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      MYSQL_HOST: host.docker.internal
     volumes:
       - ./data:/app/data
       - ./certs:/app/certs:ro
