@@ -11,7 +11,7 @@ import { OracleConnector } from "./connectors/oracle/OracleConnector.js";
 import { MysqlConnector } from "./connectors/mysql/MysqlConnector.js";
 import { WindowsConnector } from "./connectors/windows/WindowsConnector.js";
 import { ConnectorRuntimeEngine } from "./runtime/ConnectorRuntimeEngine.js";
-import { SlackMongoRuntime } from "./runtime/SlackMongoRuntime.js";
+import { MongoRuntime } from "./runtime/MongoRuntime.js";
 import { loadSlackAuth, getBotTokenFromEnvOrAuth } from "./connectors/slack/tokenStore.js";
 
 function parseArgs(argv) {
@@ -159,11 +159,6 @@ async function main() {
   }
 
   if (args.command === "extract-mongo") {
-    if (args.connector !== "slack" && args.connector !== "jira") {
-      throw new Error(
-        "MongoDB extract is only implemented for Slack and Jira. Run: npm run extract:slack:mongo or npm run extract:jira:mongo"
-      );
-    }
     const objects = args.objects || connector.getObjects();
     const known = new Set(connector.getObjects());
     const unknown = objects.filter((object) => !known.has(object));
@@ -173,9 +168,9 @@ async function main() {
       );
     }
     console.log(`[mongo] ${args.connector} objects: ${objects.join(", ")}`);
-    const runtime = new SlackMongoRuntime(connector);
+    const runtime = new MongoRuntime(connector);
     const summary = await runtime.run({ objects, mode: "full" });
-    console.log(`[mongo] run ${summary.runId} ${summary.status}`);
+    console.log(`[mongo] run ${summary.runId} ${summary.status} -> data_connector_${summary.connector}`);
     return;
   }
 
@@ -192,12 +187,11 @@ Data connector CLI
   npm run extract -- --connector mysql
   npm run extract -- --connector mysql --objects schemas,tables,columns
   npm run extract:slack | extract:postgres | extract:mysql | extract:oracle | extract:sharepoint | extract:salesforce | extract:jira | extract:googledrive | extract:box | extract:confluence | extract:windows
-  npm run extract:slack:mongo
-  npm run extract:jira:mongo
+  npm run extract:slack:mongo | extract:postgres:mongo | extract:mysql:mongo | extract:oracle:mongo | extract:sharepoint:mongo | extract:salesforce:mongo | extract:jira:mongo | extract:googledrive:mongo | extract:box:mongo | extract:confluence:mongo | extract:windows:mongo
 
 Slack:
   SLACK_BOT_TOKEN
-  MONGO_URL   (extract:slack:mongo and extract:jira:mongo)
+  MONGO_URL   (every extract:<name>:mongo command)
 
 Postgres:
   POSTGRES_URL or HOST/DATABASE/USER/PASSWORD

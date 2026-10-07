@@ -62,11 +62,12 @@ docker compose run --rm connectors npm run extract:confluence
 docker compose run --rm connectors npm run extract:windows
 ```
 
-Save Slack or Jira to MongoDB:
+Save any connector to MongoDB. Each one uses database `data_connector_<name>`:
 
 ```bash
 docker compose run --rm connectors npm run extract:slack:mongo
 docker compose run --rm connectors npm run extract:jira:mongo
+docker compose run --rm connectors npm run extract:postgres:mongo
 ```
 
 Rebuild after code changes, then run the command again. Limit objects by appending the same flags used locally:
@@ -182,12 +183,13 @@ npm run extract:slack -- --objects users,channels
 
 Output: `data/output/*.jsonl`
 
-To save the Slack or Jira extract into MongoDB (`records` and `extraction_runs` in the database named by `MONGO_URL`):
+To save an extract into MongoDB (`records` and `extraction_runs` in `data_connector_<connector>`):
 
 ```bash
 npm run extract:slack:mongo
 npm run extract:slack:mongo -- --objects users,channels
 npm run extract:jira:mongo
+npm run extract:postgres:mongo
 ```
 
 ## Project layout
@@ -201,7 +203,7 @@ src/
   connectors/slack/SlackClient.js
   connectors/slack/SlackConnector.js
   runtime/ConnectorRuntimeEngine.js   JSONL writer
-  runtime/SlackMongoRuntime.js       Slack and Jira records -> MongoDB
+  runtime/MongoRuntime.js            every connector -> MongoDB
 ```
 
 ## What auth details are used for
@@ -548,7 +550,7 @@ npm run extract -- --connector jira --objects projects,issues
 npm run extract:jira:mongo
 ```
 
-File output: `data/output/jira/*.jsonl`. `extract:jira:mongo` writes the same records to MongoDB.
+File output: `data/output/jira/*.jsonl`. `extract:jira:mongo` writes the same records to MongoDB database `data_connector_jira`.
 
 ## Project layout (Jira)
 
