@@ -18,6 +18,8 @@ export class SampleSlackConnector extends DataConnector {
    *   shardCount?: number,
    *   pageSize?: number,
    *   delayMs?: number,
+   *   logPages?: boolean,
+   *   connectorKey?: string,
    * }} [options]
    */
   constructor(options = {}) {
@@ -29,10 +31,12 @@ export class SampleSlackConnector extends DataConnector {
     this.shardCount = options.shardCount ?? 1;
     this.pageSize = options.pageSize ?? 200;
     this.delayMs = options.delayMs ?? 0;
+    this.logPages = Boolean(options.logPages);
+    this.connectorKey = options.connectorKey || "slack-sample";
   }
 
   getConnectorKey() {
-    return "slack-sample";
+    return this.connectorKey;
   }
 
   getObjects() {
@@ -92,6 +96,7 @@ export class SampleSlackConnector extends DataConnector {
 
   async *extractMessages() {
     let yieldedInPage = 0;
+    let page = 1;
     for (let i = 0; i < this.messageCount; i += 1) {
       if (i % this.shardCount !== this.shardIndex) continue;
       if (this.delayMs > 0 && yieldedInPage === 0) {
@@ -111,9 +116,21 @@ export class SampleSlackConnector extends DataConnector {
         subtype: null,
         editedTs: null,
         fileIds: [],
+        sample: true,
+        page,
+        pageSize: this.pageSize,
       });
       yieldedInPage += 1;
-      if (yieldedInPage >= this.pageSize) yieldedInPage = 0;
+      if (yieldedInPage >= this.pageSize) {
+        if (this.logPages) {
+          console.log(`[slack-sample] page ${page}: ${yieldedInPage} records (limit ${this.pageSize})`);
+        }
+        page += 1;
+        yieldedInPage = 0;
+      }
+    }
+    if (this.logPages && yieldedInPage > 0) {
+      console.log(`[slack-sample] page ${page}: ${yieldedInPage} records (limit ${this.pageSize})`);
     }
   }
 

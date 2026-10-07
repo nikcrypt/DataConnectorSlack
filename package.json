@@ -47,6 +47,7 @@
     "extract:channels": "node src/cli.js extract --objects channels",
     "extract:messages": "node src/cli.js extract --objects messages",
     "bench:slack": "node src/bench/runSlackBench.js",
+    "bench:slack:mongo": "node src/bench/runSlackMongoDemo.js",
     "env:encrypt": "node src/secrets/envFileCrypto.js encrypt",
     "env:decrypt": "node src/secrets/envFileCrypto.js decrypt"
   },
