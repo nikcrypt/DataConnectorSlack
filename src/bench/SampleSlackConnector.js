@@ -20,6 +20,7 @@ export class SampleSlackConnector extends DataConnector {
    *   delayMs?: number,
    *   logPages?: boolean,
    *   connectorKey?: string,
+   *   stopAfter?: number,
    * }} [options]
    */
   constructor(options = {}) {
@@ -33,6 +34,7 @@ export class SampleSlackConnector extends DataConnector {
     this.delayMs = options.delayMs ?? 0;
     this.logPages = Boolean(options.logPages);
     this.connectorKey = options.connectorKey || "slack-sample";
+    this.stopAfter = options.stopAfter || 0;
   }
 
   getConnectorKey() {
@@ -58,13 +60,13 @@ export class SampleSlackConnector extends DataConnector {
     return record.sourceId;
   }
 
-  async *extract(object) {
+  async *extract(object, options = {}) {
     if (!OBJECTS.includes(object)) {
       throw new Error(`Unknown sample Slack object: ${object}`);
     }
     if (object === "users") yield* this.extractUsers();
     else if (object === "channels") yield* this.extractChannels();
-    else yield* this.extractMessages();
+    else yield* this.extractMessages(options);
   }
 
   async *extractUsers() {
@@ -94,16 +96,25 @@ export class SampleSlackConnector extends DataConnector {
     }
   }
 
-  async *extractMessages() {
+  async *extractMessages(options = {}) {
+    const savedChannels = options.checkpoint?.channels || {};
     let yieldedInPage = 0;
-    let page = 1;
+    let produced = 0;
+    let lastPage = 1;
     for (let i = 0; i < this.messageCount; i += 1) {
       if (i % this.shardCount !== this.shardIndex) continue;
+      const channelId = `C${String(i % this.channelCount).padStart(6, "0")}`;
+      const ts = (1_700_000_000 + i).toFixed(6);
+      const savedTs = savedChannels[channelId]?.latest_ts;
+      if (savedTs && ts <= String(savedTs)) continue;
+      if (this.stopAfter && produced >= this.stopAfter) {
+        throw new Error(`Stopped after ${this.stopAfter} records so the next run can resume`);
+      }
       if (this.delayMs > 0 && yieldedInPage === 0) {
         await sleep(this.delayMs);
       }
-      const channelId = `C${String(i % this.channelCount).padStart(6, "0")}`;
-      const ts = (1_700_000_000 + i).toFixed(6);
+      const page = Math.floor(i / this.pageSize) + 1;
+      lastPage = page;
       const userId = `U${String(i % this.userCount).padStart(6, "0")}`;
       yield this.record("messages", `${channelId}:${ts}`, {
         channelId,
@@ -120,17 +131,17 @@ export class SampleSlackConnector extends DataConnector {
         page,
         pageSize: this.pageSize,
       });
+      produced += 1;
       yieldedInPage += 1;
       if (yieldedInPage >= this.pageSize) {
         if (this.logPages) {
           console.log(`[slack-sample] page ${page}: ${yieldedInPage} records (limit ${this.pageSize})`);
         }
-        page += 1;
         yieldedInPage = 0;
       }
     }
     if (this.logPages && yieldedInPage > 0) {
-      console.log(`[slack-sample] page ${page}: ${yieldedInPage} records (limit ${this.pageSize})`);
+      console.log(`[slack-sample] page ${lastPage}: ${yieldedInPage} records (limit ${this.pageSize})`);
     }
   }
 

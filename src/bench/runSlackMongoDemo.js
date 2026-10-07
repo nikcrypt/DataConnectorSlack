@@ -12,7 +12,15 @@ import { MongoRuntime } from "../runtime/MongoRuntime.js";
 const MESSAGES = 1000;
 const PAGE_SIZE = 200;
 
+function numberArg(name) {
+  const index = process.argv.indexOf(name);
+  if (index === -1 || !process.argv[index + 1]) return 0;
+  const value = Number(process.argv[index + 1]);
+  return Number.isFinite(value) ? value : 0;
+}
+
 async function main() {
+  const stopAfter = numberArg("--stop-after");
   const connector = new SampleSlackConnector({
     messages: MESSAGES,
     channels: 10,
@@ -20,6 +28,7 @@ async function main() {
     pageSize: PAGE_SIZE,
     logPages: true,
     connectorKey: "slack",
+    stopAfter,
   });
   const runtime = new MongoRuntime(connector);
 
@@ -30,17 +39,17 @@ async function main() {
   const counts = summary.objects.messages;
 
   console.log("");
-  console.log(`Database: data_connector_${summary.connector}`);
-  console.log(`Collection: records`);
+  console.log(`Database: ${summary.database}`);
+  console.log(`Collection: ${summary.collection}`);
   console.log(
     `Inserted ${counts.upserted}, updated ${counts.modified}, extracted ${counts.extracted}`
   );
   console.log("Each document has data.page 1 through 5 and data.sample true.");
   console.log("");
   console.log("In mongosh or Compass, group by page:");
-  console.log(`use data_connector_${summary.connector}`);
+  console.log(`use ${summary.database}`);
   console.log(
-    'db.records.aggregate([{ $match: { object: "messages", "data.sample": true } }, { $group: { _id: "$data.page", count: { $sum: 1 } } }, { $sort: { _id: 1 } }])'
+    `db.${summary.collection}.aggregate([{ $match: { object: "messages", "data.sample": true } }, { $group: { _id: "$data.page", count: { $sum: 1 } } }, { $sort: { _id: 1 } }])`
   );
 }
 

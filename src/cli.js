@@ -170,7 +170,7 @@ async function main() {
     console.log(`[mongo] ${args.connector} objects: ${objects.join(", ")}`);
     const runtime = new MongoRuntime(connector);
     const summary = await runtime.run({ objects, mode: "full" });
-    console.log(`[mongo] run ${summary.runId} ${summary.status} -> data_connector_${summary.connector}`);
+    console.log(`[mongo] run ${summary.runId} ${summary.status} -> ${summary.database}.${summary.collection}`);
     return;
   }
 

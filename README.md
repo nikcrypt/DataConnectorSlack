@@ -62,7 +62,7 @@ docker compose run --rm connectors npm run extract:confluence
 docker compose run --rm connectors npm run extract:windows
 ```
 
-Save any connector to MongoDB. Each one uses database `data_connector_<name>`:
+Save any connector to MongoDB. One database from `MONGO_URL`. Each connector is its own collection (`slack`, `jira`, `postgres`, ...):
 
 ```bash
 docker compose run --rm connectors npm run extract:slack:mongo
@@ -183,7 +183,7 @@ npm run extract:slack -- --objects users,channels
 
 Output: `data/output/*.jsonl`
 
-To save an extract into MongoDB (`records` and `extraction_runs` in `data_connector_<connector>`):
+To save an extract into MongoDB (collection `<connector>` in the `MONGO_URL` database, plus shared `extraction_runs` and `checkpoints`):
 
 ```bash
 npm run extract:slack:mongo
@@ -550,7 +550,7 @@ npm run extract -- --connector jira --objects projects,issues
 npm run extract:jira:mongo
 ```
 
-File output: `data/output/jira/*.jsonl`. `extract:jira:mongo` writes the same records to MongoDB database `data_connector_jira`.
+File output: `data/output/jira/*.jsonl`. `extract:jira:mongo` writes the same records to the `jira` collection.
 
 ## Project layout (Jira)
 
