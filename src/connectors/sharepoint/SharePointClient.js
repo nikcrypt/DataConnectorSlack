@@ -48,7 +48,7 @@ export class SharePointClient {
       grant_type: "client_credentials",
     });
 
-    const response = await fetch(TOKEN_URL(this.tenantId), {
+    const response = await graphFetch(TOKEN_URL(this.tenantId), {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body,
@@ -88,7 +88,7 @@ export class SharePointClient {
 
     let attempt = 0;
     while (true) {
-      const response = await fetch(url, {
+      const response = await graphFetch(url, {
         method: options.method || "GET",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -163,6 +163,15 @@ export class SharePointClient {
     const encoded = `${hostname}:${relative}`;
     return this.request(`/sites/${encoded}`);
   }
+}
+
+function graphFetch(url, options) {
+  return fetch(url, options).catch((err) => {
+    const cause = err.cause;
+    const detail = cause?.code || cause?.message || err.message;
+    const host = new URL(url).host;
+    throw new Error(`SharePoint network error calling ${host}: ${detail}`);
+  });
 }
 
 function sleep(ms) {
