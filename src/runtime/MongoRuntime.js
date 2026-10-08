@@ -3,7 +3,7 @@ import { MongoClient } from "mongodb";
 
 const DEFAULT_BATCH_SIZE = 200;
 
-/** Writes normalized records for every connector into one MongoDB database. */
+/** Writes normalized records from any connector to its own MongoDB database. */
 export class MongoRuntime {
   /**
    * @param {import('../connectors/base/DataConnector.js').DataConnector} connector
@@ -14,11 +14,9 @@ export class MongoRuntime {
     if (!uri) {
       throw new Error("Missing MONGO_URL or MONGODB_URI. Set it in .env");
     }
-
     this.connector = connector;
     this.connectorKey = connector.getConnectorKey?.() || "unknown";
-    this.collectionName = this.connectorKey;
-    this.checkpointCollectionName = `${this.connectorKey}_checkpoints`;
+    this.databaseName = `data_connector_${this.connectorKey}`;
     this.uri = uri;
     this.batchSize = options.batchSize ?? DEFAULT_BATCH_SIZE;
     this.createClient = options.createClient || ((mongoUri) => new MongoClient(mongoUri));
@@ -27,80 +25,73 @@ export class MongoRuntime {
     }
   }
 
-  async run({ objects, mode = "full" } = {}) {
+  async run({ objects, mode = "full", checkpoint, startedAt } = {}) {
     const selected = objects?.length ? objects : this.connector.getObjects();
     const client = this.createClient(this.uri);
     const runId = randomUUID();
-    const startedAt = new Date();
+    const runStartedAt = new Date(startedAt || Date.now());
+    const startedAtIso = runStartedAt.toISOString();
     const summary = {
       runId,
       connector: this.connectorKey,
       mode,
-      startedAt: startedAt.toISOString(),
+      startedAt: startedAtIso,
       objects: {},
     };
 
     try {
       await client.connect();
-      const db = client.db(databaseNameFromUri(this.uri));
-      const records = db.collection(this.collectionName);
+      const db = client.db(this.databaseName);
+      const records = db.collection("records");
       const runs = db.collection("extraction_runs");
-      const checkpoints = db.collection(this.checkpointCollectionName);
-      this.records = records;
-      this.runs = runs;
-      this.checkpoints = checkpoints;
-      this.legacyCheckpoints = db.collection("checkpoints");
-      this.runId = runId;
+      const checkpoints = db.collection("extraction_checkpoints");
 
       await records.createIndex(
-        { object: 1, sourceId: 1 },
+        { connectorKey: 1, object: 1, sourceId: 1 },
         { unique: true, name: "records_identity" }
       );
       await runs.createIndex(
         { connectorKey: 1, startedAt: -1 },
         { name: "runs_by_connector" }
       );
-      await checkpoints.createIndex(
-        { connectorKey: 1, object: 1 },
-        { unique: true, name: "checkpoint_identity" }
-      );
       await runs.insertOne({
         runId,
         connectorKey: this.connectorKey,
         status: "running",
         mode,
-        startedAt,
+        startedAt: runStartedAt,
         objects: {},
       });
 
-      const previous = await runs.findOne(
-        { connectorKey: this.connectorKey, runId: { $ne: runId } },
-        { sort: { startedAt: -1 } }
-      );
-      this.resume = Boolean(previous && previous.status !== "succeeded");
-      this.startedAt = startedAt;
-      this.since = null;
-      summary.database = db.databaseName;
-      summary.collection = this.collectionName;
-      console.log(`[mongo] ${this.connectorKey} run ${runId} -> ${db.databaseName}.${this.collectionName}`);
-      console.log(`[mongo] checkpoints -> ${db.databaseName}.${this.checkpointCollectionName}`);
-      if (mode === "incremental" && previous?.status === "succeeded") {
-        this.since = previous.startedAt;
-        console.log(
-          `[mongo] incremental: messages after ${previous.startedAt.toISOString()} and before ${startedAt.toISOString()}`
-        );
-      } else if (mode === "incremental") {
-        console.log("[mongo] incremental: no successful run yet, extracting the history window");
+      const objectCheckpoints = mode === "incremental"
+        ? checkpoint
+          ? { ...checkpoint }
+          : await loadCheckpoints(checkpoints, this.connectorKey, selected)
+        : {};
+      if (mode === "incremental") {
+        for (const object of selected) {
+          if (requiresCheckpoint(this.connector, object) && !objectCheckpoints[object]?.lastSuccessfulAt) {
+            throw new Error(
+              `Incremental extraction requires a previous successful run checkpoint for ${object}.`
+            );
+          }
+        }
       }
-      if (this.resume) {
-        console.log(
-          `[mongo] previous run ${previous.runId} ended ${previous.status}, resuming from checkpoints`
-        );
-      }
+
+      console.log(`[mongo] ${this.connectorKey} run ${runId} -> ${db.databaseName}.records`);
 
       try {
         for (const object of selected) {
-          summary.objects[object] = await this.extractObject(object, mode);
+          const objectCheckpoint = mode === "incremental"
+            ? objectCheckpoints[object]
+            : null;
+          summary.objects[object] = await this.extractObject(
+            records,
+            object,
+            mode,
+            objectCheckpoint,
+            startedAtIso
+          );
         }
         summary.finishedAt = new Date().toISOString();
         summary.status = "succeeded";
@@ -114,6 +105,14 @@ export class MongoRuntime {
             },
           }
         );
+        for (const object of selected) {
+          if (!requiresCheckpoint(this.connector, object)) continue;
+          await checkpoints.updateOne(
+            { connectorKey: this.connectorKey, object },
+            { $set: { connectorKey: this.connectorKey, object, lastSuccessfulAt: startedAtIso } },
+            { upsert: true }
+          );
+        }
       } catch (error) {
         summary.finishedAt = new Date().toISOString();
         summary.status = "failed";
@@ -138,119 +137,41 @@ export class MongoRuntime {
     return summary;
   }
 
-  async extractObject(object, mode) {
-    const carryCursor = this.resume || (mode === "incremental" && object === "messages");
-    const existing = carryCursor ? await this.loadCheckpoint(object) : null;
-
-    if (this.resume && existing?.status === "complete") {
-      console.log(
-        `[mongo] ${object}: checkpoint already complete (${existing.recordsSaved || 0} records), skipping`
-      );
-      return { extracted: 0, upserted: 0, modified: 0, skipped: existing.recordsSaved || 0 };
-    }
-
+  async extractObject(records, object, mode, checkpoint, startedAt) {
     const counts = { extracted: 0, upserted: 0, modified: 0 };
     let batch = [];
-    let cursor = carryCursor ? { ...(existing?.cursor || { channels: {} }) } : { channels: {} };
-    let recordsSaved = carryCursor ? existing?.recordsSaved || 0 : 0;
-    if (mode === "incremental" && object === "messages") {
-      cursor.since = this.since ? new Date(this.since).toISOString() : null;
-      cursor.until = this.startedAt.toISOString();
-    }
 
-    if (mode === "incremental" && object === "messages" && !this.resume) {
-      const channels = Object.keys(cursor.channels || {}).length;
-      console.log(`[mongo] messages: incremental using ${channels} saved channel timestamp(s)`);
-    } else if (recordsSaved > 0 && this.resume) {
-      const channels = Object.keys(cursor.channels || {}).length;
-      console.log(
-        `[mongo] ${object}: resuming after ${recordsSaved} saved records` +
-          (channels ? ` across ${channels} channels` : "")
-      );
-    } else {
-      console.log(`[mongo] extracting ${object}...`);
-    }
-
-    for await (const record of this.connector.extract(object, { mode, checkpoint: cursor })) {
+    console.log(`[mongo] extracting ${object}...`);
+    for await (const record of this.connector.extract(object, {
+      mode,
+      checkpoint: checkpoint || null,
+      startedAt,
+    })) {
       batch.push(toDocument(record));
       counts.extracted += 1;
 
       if (batch.length >= this.batchSize) {
-        const written = await this.flushAndCheckpoint(object, batch, cursor, recordsSaved);
+        const written = await flushBatch(records, batch);
         counts.upserted += written.upserted;
         counts.modified += written.modified;
-        recordsSaved = written.recordsSaved;
-        cursor = written.cursor;
         batch = [];
       }
       if (counts.extracted % 100 === 0) {
-        console.log(`[mongo] ${object}: ${counts.extracted} records this run`);
+        console.log(`[mongo] ${object}: ${counts.extracted} records`);
       }
     }
 
     if (batch.length) {
-      const written = await this.flushAndCheckpoint(object, batch, cursor, recordsSaved);
+      const written = await flushBatch(records, batch);
       counts.upserted += written.upserted;
       counts.modified += written.modified;
-      recordsSaved = written.recordsSaved;
     }
 
-    await this.checkpoints.updateOne(
-      { connectorKey: this.connectorKey, object },
-      {
-        $set: {
-          connectorKey: this.connectorKey,
-          object,
-          status: "complete",
-          cursor,
-          recordsSaved,
-          runId: this.runId,
-          updatedAt: new Date(),
-        },
-      },
-      { upsert: true }
-    );
-
     console.log(
-      `[mongo] ${object}: done (${counts.extracted} extracted, ${counts.upserted} inserted, ${counts.modified} updated, ${recordsSaved} saved total)`
+      `[mongo] ${object}: done (${counts.extracted} extracted, ${counts.upserted} inserted, ${counts.modified} updated)`
     );
     return counts;
   }
-
-  async loadCheckpoint(object) {
-    const query = { connectorKey: this.connectorKey, object };
-    const current = await this.checkpoints.findOne(query);
-    if (current) return current;
-    return this.legacyCheckpoints.findOne(query);
-  }
-
-  async flushAndCheckpoint(object, batch, cursor, recordsSaved) {
-    const written = await flushBatch(this.records, batch);
-    const nextCursor = mergeCursor(cursor, batch);
-    const nextSaved = recordsSaved + batch.length;
-    await this.checkpoints.updateOne(
-      { connectorKey: this.connectorKey, object },
-      {
-        $set: {
-          connectorKey: this.connectorKey,
-          object,
-          status: "in_progress",
-          cursor: nextCursor,
-          recordsSaved: nextSaved,
-          runId: this.runId,
-          updatedAt: new Date(),
-        },
-      },
-      { upsert: true }
-    );
-    return { ...written, cursor: nextCursor, recordsSaved: nextSaved };
-  }
-}
-
-function databaseNameFromUri(uri) {
-  const parsed = new URL(uri.replace(/^mongodb(\+srv)?:/, "https:"));
-  const name = decodeURIComponent(parsed.pathname.replace(/^\//, ""));
-  return name || "data_connector_poc_micro_service";
 }
 
 function toDocument(record) {
@@ -273,44 +194,34 @@ function toDocument(record) {
 
 async function flushBatch(records, batch) {
   const result = await records.bulkWrite(
-    batch.map((document) => ({
+    batch.map((doc) => ({
       updateOne: {
-        filter: {
-          connectorKey: document.connectorKey,
-          object: document.object,
-          sourceId: document.sourceId,
-        },
-        update: {
-          $set: document,
-          $setOnInsert: { createdAt: document.updatedAt },
-        },
+        filter: { connectorKey: doc.connectorKey, object: doc.object, sourceId: doc.sourceId },
+        update: { $set: doc, $setOnInsert: { createdAt: doc.updatedAt } },
         upsert: true,
       },
     })),
     { ordered: false }
   );
-
-  return {
-    upserted: result.upsertedCount || 0,
-    modified: result.modifiedCount || 0,
-  };
+  return { upserted: result.upsertedCount || 0, modified: result.modifiedCount || 0 };
 }
 
-function mergeCursor(cursor, batch) {
-  const channels = { ...(cursor?.channels || {}) };
-  for (const document of batch) {
-    const channelId = document.data?.channelId;
-    const timestamp = document.data?.timestamp;
-    if (!channelId || timestamp == null) continue;
-    const latest = String(timestamp);
-    const previous = channels[channelId]?.latest_ts;
-    if (!previous || latest > String(previous)) {
-      channels[channelId] = { latest_ts: latest };
-    }
+async function loadCheckpoints(checkpoints, connectorKey, objects) {
+  const result = {};
+  for (const object of objects) {
+    const checkpoint = await checkpoints.findOne({ connectorKey, object });
+    if (checkpoint) result[object] = {
+      lastSuccessfulAt: checkpoint.lastSuccessfulAt,
+    };
   }
-  return { channels };
+  return result;
 }
 
-function safeError(error) {
-  return String(error?.message || error).replace(/mongodb(?:\+srv)?:\/\/\S+/gi, "mongodb://***");
+function requiresCheckpoint(connector, object) {
+  const checkpoint = connector.getCheckpoint?.(object);
+  return checkpoint !== null && checkpoint !== undefined;
+}
+
+function safeError(err) {
+  return String(err?.message || err).replace(/mongodb(?:\+srv)?:\/\/\S+/gi, "mongodb://***");
 }
