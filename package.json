@@ -22,6 +22,7 @@
     "extract": "node src/cli.js extract",
     "extract:slack": "node src/cli.js extract --connector slack",
     "extract:slack:mongo": "node src/cli.js extract-mongo --connector slack",
+    "extract:slack:mongo:incremental": "node src/cli.js extract-mongo --connector slack --mode incremental --objects messages",
     "extract:postgres": "node src/cli.js extract --connector postgres",
     "extract:postgres:mongo": "node src/cli.js extract-mongo --connector postgres",
     "extract:mysql": "node src/cli.js extract --connector mysql",

@@ -250,16 +250,19 @@ export class SlackConnector extends DataConnector {
     const channelIds = await this.listChannelIds(options);
     const oldest = this.oldestTs();
     const checkpoints = options.checkpoint?.channels || {};
+    const since = options.checkpoint?.since ? slackTs(options.checkpoint.since) : undefined;
+    const latest = options.checkpoint?.until ? slackTs(options.checkpoint.until) : undefined;
 
     for (const channelId of channelIds) {
       const channelOldest = checkpoints[channelId]?.latest_ts
         ? String(checkpoints[channelId].latest_ts)
-        : oldest;
+        : since || oldest;
 
       try {
         for await (const message of this.client.paginate("conversations.history", "messages", {
           channel: channelId,
           oldest: channelOldest,
+          latest,
           inclusive: false,
         })) {
           // Skip thread replies here — they come from conversations.replies
@@ -430,6 +433,11 @@ export class SlackConnector extends DataConnector {
     payload.hash = hashRecord(payload.data);
     return payload;
   }
+}
+
+function slackTs(value) {
+  const ms = value instanceof Date ? value.getTime() : new Date(value).getTime();
+  return (ms / 1000).toFixed(6);
 }
 
 function hashRecord(data) {

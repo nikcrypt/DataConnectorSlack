@@ -18,6 +18,7 @@ export class MongoRuntime {
     this.connector = connector;
     this.connectorKey = connector.getConnectorKey?.() || "unknown";
     this.collectionName = this.connectorKey;
+    this.checkpointCollectionName = `${this.connectorKey}_checkpoints`;
     this.uri = uri;
     this.batchSize = options.batchSize ?? DEFAULT_BATCH_SIZE;
     this.createClient = options.createClient || ((mongoUri) => new MongoClient(mongoUri));
@@ -44,10 +45,11 @@ export class MongoRuntime {
       const db = client.db(databaseNameFromUri(this.uri));
       const records = db.collection(this.collectionName);
       const runs = db.collection("extraction_runs");
-      const checkpoints = db.collection("checkpoints");
+      const checkpoints = db.collection(this.checkpointCollectionName);
       this.records = records;
       this.runs = runs;
       this.checkpoints = checkpoints;
+      this.legacyCheckpoints = db.collection("checkpoints");
       this.runId = runId;
 
       await records.createIndex(
@@ -76,9 +78,20 @@ export class MongoRuntime {
         { sort: { startedAt: -1 } }
       );
       this.resume = Boolean(previous && previous.status !== "succeeded");
+      this.startedAt = startedAt;
+      this.since = null;
       summary.database = db.databaseName;
       summary.collection = this.collectionName;
       console.log(`[mongo] ${this.connectorKey} run ${runId} -> ${db.databaseName}.${this.collectionName}`);
+      console.log(`[mongo] checkpoints -> ${db.databaseName}.${this.checkpointCollectionName}`);
+      if (mode === "incremental" && previous?.status === "succeeded") {
+        this.since = previous.startedAt;
+        console.log(
+          `[mongo] incremental: messages after ${previous.startedAt.toISOString()} and before ${startedAt.toISOString()}`
+        );
+      } else if (mode === "incremental") {
+        console.log("[mongo] incremental: no successful run yet, extracting the history window");
+      }
       if (this.resume) {
         console.log(
           `[mongo] previous run ${previous.runId} ended ${previous.status}, resuming from checkpoints`
@@ -126,11 +139,10 @@ export class MongoRuntime {
   }
 
   async extractObject(object, mode) {
-    const existing = this.resume
-      ? await this.checkpoints.findOne({ connectorKey: this.connectorKey, object })
-      : null;
+    const carryCursor = this.resume || (mode === "incremental" && object === "messages");
+    const existing = carryCursor ? await this.loadCheckpoint(object) : null;
 
-    if (existing?.status === "complete") {
+    if (this.resume && existing?.status === "complete") {
       console.log(
         `[mongo] ${object}: checkpoint already complete (${existing.recordsSaved || 0} records), skipping`
       );
@@ -139,10 +151,17 @@ export class MongoRuntime {
 
     const counts = { extracted: 0, upserted: 0, modified: 0 };
     let batch = [];
-    let cursor = existing?.cursor || { channels: {} };
-    let recordsSaved = existing?.recordsSaved || 0;
+    let cursor = carryCursor ? { ...(existing?.cursor || { channels: {} }) } : { channels: {} };
+    let recordsSaved = carryCursor ? existing?.recordsSaved || 0 : 0;
+    if (mode === "incremental" && object === "messages") {
+      cursor.since = this.since ? new Date(this.since).toISOString() : null;
+      cursor.until = this.startedAt.toISOString();
+    }
 
-    if (recordsSaved > 0) {
+    if (mode === "incremental" && object === "messages" && !this.resume) {
+      const channels = Object.keys(cursor.channels || {}).length;
+      console.log(`[mongo] messages: incremental using ${channels} saved channel timestamp(s)`);
+    } else if (recordsSaved > 0 && this.resume) {
       const channels = Object.keys(cursor.channels || {}).length;
       console.log(
         `[mongo] ${object}: resuming after ${recordsSaved} saved records` +
@@ -183,6 +202,7 @@ export class MongoRuntime {
           connectorKey: this.connectorKey,
           object,
           status: "complete",
+          cursor,
           recordsSaved,
           runId: this.runId,
           updatedAt: new Date(),
@@ -195,6 +215,13 @@ export class MongoRuntime {
       `[mongo] ${object}: done (${counts.extracted} extracted, ${counts.upserted} inserted, ${counts.modified} updated, ${recordsSaved} saved total)`
     );
     return counts;
+  }
+
+  async loadCheckpoint(object) {
+    const query = { connectorKey: this.connectorKey, object };
+    const current = await this.checkpoints.findOne(query);
+    if (current) return current;
+    return this.legacyCheckpoints.findOne(query);
   }
 
   async flushAndCheckpoint(object, batch, cursor, recordsSaved) {

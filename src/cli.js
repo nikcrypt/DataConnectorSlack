@@ -19,6 +19,7 @@ function parseArgs(argv) {
     command: argv[2] || "help",
     connector: "slack",
     objects: null,
+    mode: "full",
   };
 
   for (let i = 3; i < argv.length; i += 1) {
@@ -27,6 +28,9 @@ function parseArgs(argv) {
       i += 1;
     } else if (argv[i] === "--objects" && argv[i + 1]) {
       args.objects = argv[i + 1].split(",").map((s) => s.trim()).filter(Boolean);
+      i += 1;
+    } else if (argv[i] === "--mode" && argv[i + 1]) {
+      args.mode = argv[i + 1].trim().toLowerCase();
       i += 1;
     }
   }
@@ -154,7 +158,7 @@ async function main() {
     console.log(
       `[runtime] ${connector.getConnectorKey()} objects: ${objects.join(", ")}`
     );
-    await runtime.run({ objects, mode: "full" });
+    await runtime.run({ objects, mode: args.mode || "full" });
     return;
   }
 
@@ -169,7 +173,7 @@ async function main() {
     }
     console.log(`[mongo] ${args.connector} objects: ${objects.join(", ")}`);
     const runtime = new MongoRuntime(connector);
-    const summary = await runtime.run({ objects, mode: "full" });
+    const summary = await runtime.run({ objects, mode: args.mode || "full" });
     console.log(`[mongo] run ${summary.runId} ${summary.status} -> ${summary.database}.${summary.collection}`);
     return;
   }
@@ -188,6 +192,7 @@ Data connector CLI
   npm run extract -- --connector mysql --objects schemas,tables,columns
   npm run extract:slack | extract:postgres | extract:mysql | extract:oracle | extract:sharepoint | extract:salesforce | extract:jira | extract:googledrive | extract:box | extract:confluence | extract:windows
   npm run extract:slack:mongo | extract:postgres:mongo | extract:mysql:mongo | extract:oracle:mongo | extract:sharepoint:mongo | extract:salesforce:mongo | extract:jira:mongo | extract:googledrive:mongo | extract:box:mongo | extract:confluence:mongo | extract:windows:mongo
+  npm run extract:slack:mongo:incremental
 
 Slack:
   SLACK_BOT_TOKEN
