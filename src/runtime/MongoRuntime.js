@@ -77,6 +77,8 @@ export class MongoRuntime {
         }
       }
 
+      summary.database = db.databaseName;
+      summary.collection = this.connectorKey;
       console.log(`[mongo] ${this.connectorKey} run ${runId} -> ${db.databaseName}.${this.connectorKey}`);
       console.log(`[mongo] checkpoints -> ${db.databaseName}.extraction_checkpoints`);
 
