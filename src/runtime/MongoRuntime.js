@@ -111,7 +111,14 @@ export class MongoRuntime {
           if (!requiresCheckpoint(this.connector, object)) continue;
           await checkpoints.updateOne(
             { connectorKey: this.connectorKey, object },
-            { $set: { connectorKey: this.connectorKey, object, lastSuccessfulAt: startedAtIso } },
+            {
+              $set: {
+                connectorKey: this.connectorKey,
+                object,
+                lastSuccessfulAt: startedAtIso,
+                runId,
+              },
+            },
             { upsert: true }
           );
         }
