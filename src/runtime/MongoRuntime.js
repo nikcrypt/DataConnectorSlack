@@ -46,7 +46,7 @@ export class MongoRuntime {
       const checkpoints = db.collection("extraction_checkpoints");
 
       await records.createIndex(
-        { connectorKey: 1, object: 1, sourceId: 1 },
+        { object: 1, sourceId: 1 },
         { unique: true, name: "records_identity" }
       );
       await runs.createIndex(
