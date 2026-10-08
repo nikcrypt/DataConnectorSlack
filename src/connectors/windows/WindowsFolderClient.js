@@ -1,3 +1,5 @@
+import { spawnSync } from "node:child_process";
+import crypto from "node:crypto";
 import { lstat, readdir, readFile, realpath } from "node:fs/promises";
 import path from "node:path";
 import { createRequire } from "node:module";
@@ -135,6 +137,7 @@ export class WindowsFolderClient {
 
   getSmb() {
     if (this.smb) return this.smb;
+    ensureSmbCrypto();
     const SMB2 = require("@marsaud/smb2");
     this.smb = new SMB2({
       share: `\\\\${this.target.host}\\${this.target.share}`,
@@ -166,6 +169,22 @@ async function describeSmb(client, name, fullPath) {
       };
     }
   }
+}
+
+function ensureSmbCrypto() {
+  if (process.execArgv.includes("--openssl-legacy-provider")) return;
+  try {
+    crypto.createCipheriv("des-ecb", Buffer.alloc(8), "");
+    return;
+  } catch (err) {
+    if (err.code !== "ERR_OSSL_EVP_UNSUPPORTED") throw err;
+  }
+  const child = spawnSync(
+    process.execPath,
+    ["--openssl-legacy-provider", ...process.execArgv, ...process.argv.slice(1)],
+    { stdio: "inherit" }
+  );
+  process.exit(child.status ?? 1);
 }
 
 function smbJoin(folder, relative) {
