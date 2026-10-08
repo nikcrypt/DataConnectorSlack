@@ -72,6 +72,7 @@ export class SlackConnector extends DataConnector {
   }
 
   getCheckpoint(object) {
+    if (object === "messages") return { type: "timestamp" };
     return null;
   }
 
@@ -250,8 +251,10 @@ export class SlackConnector extends DataConnector {
     const channelIds = await this.listChannelIds(options);
     const oldest = this.oldestTs();
     const checkpoints = options.checkpoint?.channels || {};
-    const since = options.checkpoint?.since ? slackTs(options.checkpoint.since) : undefined;
-    const latest = options.checkpoint?.until ? slackTs(options.checkpoint.until) : undefined;
+    const watermark = options.checkpoint?.since || options.checkpoint?.lastSuccessfulAt;
+    const until = options.checkpoint?.until || (options.mode === "incremental" ? options.startedAt : undefined);
+    const since = watermark ? slackTs(watermark) : undefined;
+    const latest = until ? slackTs(until) : undefined;
 
     for (const channelId of channelIds) {
       const channelOldest = checkpoints[channelId]?.latest_ts

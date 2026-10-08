@@ -183,7 +183,7 @@ npm run extract:slack -- --objects users,channels
 
 Output: `data/output/*.jsonl`
 
-To save an extract into MongoDB (collection `<connector>` in the `MONGO_URL` database, shared `extraction_runs`, and `<connector>_checkpoints`):
+To save an extract into MongoDB (collection `<connector>` in the `MONGO_URL` database, plus shared `extraction_runs` and `extraction_checkpoints`):
 
 ```bash
 npm run extract:slack:mongo

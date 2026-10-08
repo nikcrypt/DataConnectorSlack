@@ -3,7 +3,7 @@ import { MongoClient } from "mongodb";
 
 const DEFAULT_BATCH_SIZE = 200;
 
-/** Writes normalized records from any connector to its own MongoDB database. */
+/** Writes normalized records for every connector into the database named in MONGO_URL. */
 export class MongoRuntime {
   /**
    * @param {import('../connectors/base/DataConnector.js').DataConnector} connector
@@ -16,7 +16,6 @@ export class MongoRuntime {
     }
     this.connector = connector;
     this.connectorKey = connector.getConnectorKey?.() || "unknown";
-    this.databaseName = `data_connector_${this.connectorKey}`;
     this.uri = uri;
     this.batchSize = options.batchSize ?? DEFAULT_BATCH_SIZE;
     this.createClient = options.createClient || ((mongoUri) => new MongoClient(mongoUri));
@@ -41,8 +40,8 @@ export class MongoRuntime {
 
     try {
       await client.connect();
-      const db = client.db(this.databaseName);
-      const records = db.collection("records");
+      const db = client.db(databaseNameFromUri(this.uri));
+      const records = db.collection(this.connectorKey);
       const runs = db.collection("extraction_runs");
       const checkpoints = db.collection("extraction_checkpoints");
 
@@ -78,7 +77,8 @@ export class MongoRuntime {
         }
       }
 
-      console.log(`[mongo] ${this.connectorKey} run ${runId} -> ${db.databaseName}.records`);
+      console.log(`[mongo] ${this.connectorKey} run ${runId} -> ${db.databaseName}.${this.connectorKey}`);
+      console.log(`[mongo] checkpoints -> ${db.databaseName}.extraction_checkpoints`);
 
       try {
         for (const object of selected) {
@@ -215,6 +215,12 @@ async function loadCheckpoints(checkpoints, connectorKey, objects) {
     };
   }
   return result;
+}
+
+function databaseNameFromUri(uri) {
+  const parsed = new URL(uri.replace(/^mongodb(\+srv)?:/, "https:"));
+  const name = decodeURIComponent(parsed.pathname.replace(/^\//, ""));
+  return name || "data_connector_poc_micro_service";
 }
 
 function requiresCheckpoint(connector, object) {
