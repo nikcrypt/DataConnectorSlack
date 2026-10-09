@@ -92,7 +92,8 @@ export class MongoRuntime {
             object,
             mode,
             objectCheckpoint,
-            startedAtIso
+            startedAtIso,
+            runId
           );
         }
         summary.finishedAt = new Date().toISOString();
@@ -146,7 +147,7 @@ export class MongoRuntime {
     return summary;
   }
 
-  async extractObject(records, object, mode, checkpoint, startedAt) {
+  async extractObject(records, object, mode, checkpoint, startedAt, runId) {
     const counts = { extracted: 0, upserted: 0, modified: 0 };
     let batch = [];
 
@@ -156,7 +157,7 @@ export class MongoRuntime {
       checkpoint: checkpoint || null,
       startedAt,
     })) {
-      batch.push(toDocument(record));
+      batch.push(toDocument(record, runId));
       counts.extracted += 1;
 
       if (batch.length >= this.batchSize) {
@@ -183,7 +184,7 @@ export class MongoRuntime {
   }
 }
 
-function toDocument(record) {
+function toDocument(record, runId) {
   if (!record.connectorKey || !record.object || record.sourceId == null) {
     throw new Error("Connector record is missing connectorKey, object, or sourceId");
   }
@@ -192,6 +193,7 @@ function toDocument(record) {
     connectorKey: record.connectorKey,
     object: record.object,
     sourceId: String(record.sourceId),
+    runId: runId || null,
     data: record.data,
     rawData: record.rawData ?? null,
     hash: record.hash,
@@ -229,7 +231,7 @@ async function loadCheckpoints(checkpoints, connectorKey, objects) {
 function databaseNameFromUri(uri) {
   const parsed = new URL(uri.replace(/^mongodb(\+srv)?:/, "https:"));
   const name = decodeURIComponent(parsed.pathname.replace(/^\//, ""));
-  return name || "data_connector_poc_micro_service";
+  return name || "data_connector_db";
 }
 
 function requiresCheckpoint(connector, object) {
