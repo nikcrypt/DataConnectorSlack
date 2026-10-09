@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { DataConnector } from "../base/DataConnector.js";
 import { SharePointClient } from "./SharePointClient.js";
+import { incrementalWindow, inWindow } from "../base/incrementalWindow.js";
 
 const OBJECTS = ["sites", "lists", "columns", "listItems", "drives", "driveItems"];
 
@@ -72,7 +73,12 @@ export class SharePointConnector extends DataConnector {
     return record.sourceId;
   }
 
-  async *extract(object) {
+  getCheckpoint(object) {
+    if (object === "listItems" || object === "driveItems") return { type: "timestamp" };
+    return null;
+  }
+
+  async *extract(object, options = {}) {
     if (!OBJECTS.includes(object)) {
       throw new Error(`Unknown SharePoint object: ${object}`);
     }
@@ -90,13 +96,13 @@ export class SharePointConnector extends DataConnector {
         yield* this.extractColumns(site);
         break;
       case "listItems":
-        yield* this.extractListItems(site);
+        yield* this.extractListItems(site, options);
         break;
       case "drives":
         yield* this.extractDrives(site);
         break;
       case "driveItems":
-        yield* this.extractDriveItems(site);
+        yield* this.extractDriveItems(site, options);
         break;
       default:
         throw new Error(`Extract not implemented for ${object}`);
@@ -160,7 +166,11 @@ export class SharePointConnector extends DataConnector {
     }
   }
 
-  async *extractListItems(site) {
+  async *extractListItems(site, options = {}) {
+    const window = incrementalWindow(options);
+    if (window) {
+      console.log(`[sharepoint] incremental items modified from ${window.since.toISOString()} until ${window.until.toISOString()}`);
+    }
     for await (const list of this.client.paginate(`/sites/${site.id}/lists`)) {
       // Skip pure document libraries if desired? Keep all lists for POC.
       try {
@@ -169,6 +179,7 @@ export class SharePointConnector extends DataConnector {
           "value",
           { $expand: "fields" }
         )) {
+          if (!inWindow(item.lastModifiedDateTime || item.createdDateTime, window)) continue;
           yield this.record(
             "listItems",
             `${site.id}:${list.id}:${item.id}`,
@@ -204,23 +215,25 @@ export class SharePointConnector extends DataConnector {
     }
   }
 
-  async *extractDriveItems(site) {
+  async *extractDriveItems(site, options = {}) {
+    const window = incrementalWindow(options);
     for await (const drive of this.client.paginate(`/sites/${site.id}/drives`)) {
       try {
-        yield* this.walkDriveChildren(site.id, drive.id, `/drives/${drive.id}/root/children`);
+        yield* this.walkDriveChildren(site.id, drive.id, `/drives/${drive.id}/root/children`, 0, window);
       } catch (err) {
         console.warn(`[sharepoint] driveItems skipped for drive ${drive.id}:`, err.message);
       }
     }
   }
 
-  async *walkDriveChildren(siteId, driveId, path, depth = 0) {
+  async *walkDriveChildren(siteId, driveId, path, depth = 0, window = null) {
     // Bound depth for POC to avoid huge libraries
     if (depth > 5) return;
 
     for await (const item of this.client.paginate(path)) {
       const isFolder = Boolean(item.folder);
-      yield this.record(
+      if (inWindow(item.lastModifiedDateTime || item.createdDateTime, window)) {
+        yield this.record(
         "driveItems",
         `${driveId}:${item.id}`,
         {
@@ -239,13 +252,15 @@ export class SharePointConnector extends DataConnector {
         },
         item
       );
+      }
 
       if (isFolder && item.id) {
         yield* this.walkDriveChildren(
           siteId,
           driveId,
           `/drives/${driveId}/items/${item.id}/children`,
-          depth + 1
+          depth + 1,
+          window
         );
       }
     }

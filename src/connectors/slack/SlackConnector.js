@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { DataConnector } from "../base/DataConnector.js";
 import { SlackClient, SlackDualClient } from "./SlackClient.js";
+import { incrementalWindow } from "../base/incrementalWindow.js";
 
 const OBJECTS = [
   "workspaces",
@@ -72,7 +73,7 @@ export class SlackConnector extends DataConnector {
   }
 
   getCheckpoint(object) {
-    if (object === "messages") return { type: "timestamp" };
+    if (object === "messages" || object === "files") return { type: "timestamp" };
     return null;
   }
 
@@ -110,7 +111,7 @@ export class SlackConnector extends DataConnector {
         yield* this.extractReactions(options);
         break;
       case "files":
-        yield* this.extractFiles();
+        yield* this.extractFiles(options);
         break;
       default:
         throw new Error(`Extract not implemented for ${object}`);
@@ -396,9 +397,16 @@ export class SlackConnector extends DataConnector {
     }
   }
 
-  async *extractFiles() {
+  async *extractFiles(options = {}) {
+    const window = incrementalWindow(options);
+    const params = {};
+    if (window) {
+      params.ts_from = String(Math.floor(window.since.getTime() / 1000));
+      params.ts_to = String(Math.floor(window.until.getTime() / 1000));
+      console.log(`[slack] incremental files created from ${window.since.toISOString()} until ${window.until.toISOString()}`);
+    }
     try {
-      for await (const file of this.client.paginate("files.list", "files")) {
+      for await (const file of this.client.paginate("files.list", "files", params)) {
         yield this.record(
           "files",
           file.id,

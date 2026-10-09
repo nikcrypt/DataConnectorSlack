@@ -4,6 +4,7 @@ import path from "node:path";
 import { DataConnector } from "../base/DataConnector.js";
 import { parseFolderUrl } from "./parseFolderUrl.js";
 import { WindowsFolderClient } from "./WindowsFolderClient.js";
+import { incrementalWindow, inWindow } from "../base/incrementalWindow.js";
 
 const OBJECTS = ["folders", "files"];
 const DEFAULT_MAX_DEPTH = 5;
@@ -73,7 +74,12 @@ export class WindowsConnector extends DataConnector {
     return record.sourceId;
   }
 
-  async *extract(object) {
+  getCheckpoint(object) {
+    if (object === "files") return { type: "timestamp" };
+    return null;
+  }
+
+  async *extract(object, options = {}) {
     if (!OBJECTS.includes(object)) {
       throw new Error(`Unknown Windows object: ${object}. Valid objects: ${OBJECTS.join(", ")}`);
     }
@@ -82,7 +88,11 @@ export class WindowsConnector extends DataConnector {
       if (object === "folders") {
         yield* this.walkFolders("", 0);
       } else {
-        yield* this.walkFiles("", 0);
+        const window = incrementalWindow(options);
+        if (window) {
+          console.log(`[windows] incremental files modified from ${window.since.toISOString()} until ${window.until.toISOString()}`);
+        }
+        yield* this.walkFiles("", 0, window);
       }
     } finally {
       await this.client.close();
@@ -108,7 +118,7 @@ export class WindowsConnector extends DataConnector {
     }
   }
 
-  async *walkFiles(relative, depth) {
+  async *walkFiles(relative, depth, window = null) {
     if (this.seen >= this.maxFiles) return;
     const entries = await this.client.list(relative);
     for (const entry of entries) {
@@ -116,10 +126,11 @@ export class WindowsConnector extends DataConnector {
       const child = joinRelative(relative, entry.name);
       if (entry.kind === "directory") {
         if (depth + 1 < this.maxDepth) {
-          yield* this.walkFiles(child, depth + 1);
+          yield* this.walkFiles(child, depth + 1, window);
         }
         continue;
       }
+      if (window && !inWindow(entry.modifiedAt, window)) continue;
       if (entry.kind !== "file") {
         this.seen += 1;
         yield this.record("files", child, {

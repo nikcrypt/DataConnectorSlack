@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { DataConnector } from "../base/DataConnector.js";
 import { BoxClient } from "./BoxClient.js";
+import { incrementalWindow, inWindow } from "../base/incrementalWindow.js";
 
 const OBJECTS = ["users", "folders", "files", "collaborations"];
 
@@ -60,7 +61,12 @@ export class BoxConnector extends DataConnector {
     return record.sourceId;
   }
 
-  async *extract(object) {
+  getCheckpoint(object) {
+    if (object === "files" || object === "folders") return { type: "timestamp" };
+    return null;
+  }
+
+  async *extract(object, options = {}) {
     if (!OBJECTS.includes(object)) {
       throw new Error(`Unknown Box object: ${object}`);
     }
@@ -70,10 +76,10 @@ export class BoxConnector extends DataConnector {
         yield* this.extractUsers();
         break;
       case "folders":
-        yield* this.extractFolders();
+        yield* this.extractFolders(options);
         break;
       case "files":
-        yield* this.extractFiles();
+        yield* this.extractFiles(options);
         break;
       case "collaborations":
         yield* this.extractCollaborations();
@@ -122,16 +128,23 @@ export class BoxConnector extends DataConnector {
     }
   }
 
-  async *extractFolders() {
+  async *extractFolders(options = {}) {
+    const window = incrementalWindow(options);
+    if (window) {
+      console.log(`[box] incremental items modified from ${window.since.toISOString()} until ${window.until.toISOString()}`);
+    }
     for await (const item of this.walkItems()) {
       if (item.type !== "folder") continue;
+      if (!inWindow(item.modified_at || item.created_at, window)) continue;
       yield this.mapItem("folders", item);
     }
   }
 
-  async *extractFiles() {
+  async *extractFiles(options = {}) {
+    const window = incrementalWindow(options);
     for await (const item of this.walkItems()) {
       if (item.type !== "file") continue;
+      if (!inWindow(item.modified_at || item.created_at, window)) continue;
       yield this.mapItem("files", item);
     }
   }

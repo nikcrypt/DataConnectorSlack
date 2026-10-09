@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { DataConnector } from "../base/DataConnector.js";
 import { ConfluenceClient } from "./ConfluenceClient.js";
+import { incrementalWindow, inWindow } from "../base/incrementalWindow.js";
 
 const OBJECTS = ["spaces", "pages", "blogposts", "attachments"];
 
@@ -62,7 +63,14 @@ export class ConfluenceConnector extends DataConnector {
     return record.sourceId;
   }
 
-  async *extract(object) {
+  getCheckpoint(object) {
+    if (object === "pages" || object === "blogposts" || object === "attachments") {
+      return { type: "timestamp" };
+    }
+    return null;
+  }
+
+  async *extract(object, options = {}) {
     if (!OBJECTS.includes(object)) {
       throw new Error(`Unknown Confluence object: ${object}`);
     }
@@ -72,13 +80,13 @@ export class ConfluenceConnector extends DataConnector {
         yield* this.extractSpaces();
         break;
       case "pages":
-        yield* this.extractPages();
+        yield* this.extractPages(options);
         break;
       case "blogposts":
-        yield* this.extractBlogposts();
+        yield* this.extractBlogposts(options);
         break;
       case "attachments":
-        yield* this.extractAttachments();
+        yield* this.extractAttachments(options);
         break;
       default:
         throw new Error(`Extract not implemented for ${object}`);
@@ -106,29 +114,37 @@ export class ConfluenceConnector extends DataConnector {
     }
   }
 
-  async *extractPages() {
+  async *extractPages(options = {}) {
+    const window = incrementalWindow(options);
+    if (window) {
+      console.log(`[confluence] incremental content from ${window.since.toISOString()} until ${window.until.toISOString()}`);
+    }
     for await (const page of this.client.paginate(
       "/wiki/api/v2/pages",
       { "body-format": "storage" },
       25,
       this.maxPages
     )) {
+      if (!inWindow(page.version?.createdAt || page.createdAt, window)) continue;
       yield this.mapContent("pages", page);
     }
   }
 
-  async *extractBlogposts() {
+  async *extractBlogposts(options = {}) {
+    const window = incrementalWindow(options);
     for await (const post of this.client.paginate(
       "/wiki/api/v2/blogposts",
       { "body-format": "storage" },
       25,
       this.maxBlogposts
     )) {
+      if (!inWindow(post.version?.createdAt || post.createdAt, window)) continue;
       yield this.mapContent("blogposts", post);
     }
   }
 
-  async *extractAttachments() {
+  async *extractAttachments(options = {}) {
+    const window = incrementalWindow(options);
     const pageIds = [];
     for await (const page of this.client.paginate(
       "/wiki/api/v2/pages",
@@ -144,6 +160,7 @@ export class ConfluenceConnector extends DataConnector {
         for await (const attachment of this.client.paginate(
           `/wiki/api/v2/pages/${encodeURIComponent(page.id)}/attachments`
         )) {
+          if (!inWindow(attachment.version?.createdAt || attachment.createdAt, window)) continue;
           yield this.record(
             "attachments",
             attachment.id,

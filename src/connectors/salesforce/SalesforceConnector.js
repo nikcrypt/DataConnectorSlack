@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { DataConnector } from "../base/DataConnector.js";
 import { SalesforceClient } from "./SalesforceClient.js";
+import { incrementalWindow } from "../base/incrementalWindow.js";
 
 const OBJECTS = ["sobjects", "fields", "records"];
 
@@ -59,7 +60,12 @@ export class SalesforceConnector extends DataConnector {
     return record.sourceId;
   }
 
-  async *extract(object) {
+  getCheckpoint(object) {
+    if (object === "records") return { type: "timestamp" };
+    return null;
+  }
+
+  async *extract(object, options = {}) {
     if (!OBJECTS.includes(object)) {
       throw new Error(`Unknown Salesforce object: ${object}`);
     }
@@ -72,7 +78,7 @@ export class SalesforceConnector extends DataConnector {
         yield* this.extractFields();
         break;
       case "records":
-        yield* this.extractRecords();
+        yield* this.extractRecords(options);
         break;
       default:
         throw new Error(`Extract not implemented for ${object}`);
@@ -128,7 +134,11 @@ export class SalesforceConnector extends DataConnector {
     }
   }
 
-  async *extractRecords() {
+  async *extractRecords(options = {}) {
+    const window = incrementalWindow(options);
+    if (window) {
+      console.log(`[salesforce] incremental records modified from ${window.since.toISOString()} until ${window.until.toISOString()}`);
+    }
     console.log(
       `[salesforce] record limit per object: ${this.recordLimit} (SALESFORCE_RECORD_LIMIT)`
     );
@@ -144,7 +154,7 @@ export class SalesforceConnector extends DataConnector {
         const selected = selectableFieldNames(describe.fields);
         const progress = { count: 0 };
         try {
-          yield* this.extractObjectRecords(name, selected, progress);
+          yield* this.extractObjectRecords(name, selected, progress, window);
         } catch (err) {
           if (progress.count > 0) {
             console.warn(
@@ -155,7 +165,7 @@ export class SalesforceConnector extends DataConnector {
           console.warn(
             `[salesforce] ${name} query failed, retrying with Id and Name: ${err.message}`
           );
-          yield* this.extractObjectRecords(name, ["Id", "Name"], progress);
+          yield* this.extractObjectRecords(name, ["Id", "Name"], progress, window);
         }
         console.log(`[salesforce] ${name}: fetched ${progress.count} records`);
       } catch (err) {
@@ -164,9 +174,12 @@ export class SalesforceConnector extends DataConnector {
     }
   }
 
-  async *extractObjectRecords(name, fieldNames, progress) {
+  async *extractObjectRecords(name, fieldNames, progress, window = null) {
     const selected = ["Id", ...fieldNames.filter((field) => field !== "Id")];
-    const soql = `SELECT ${selected.join(", ")} FROM ${name} LIMIT ${this.recordLimit}`;
+    const where = window
+      ? ` WHERE LastModifiedDate >= ${soqlTime(window.since)} AND LastModifiedDate < ${soqlTime(window.until)}`
+      : "";
+    const soql = `SELECT ${selected.join(", ")} FROM ${name}${where} LIMIT ${this.recordLimit}`;
 
     for await (const row of this.client.query(soql)) {
       const { attributes, Id, ...rest } = row;
@@ -199,6 +212,10 @@ export class SalesforceConnector extends DataConnector {
     payload.hash = createHash("sha256").update(JSON.stringify(data)).digest("hex");
     return payload;
   }
+}
+
+function soqlTime(date) {
+  return date.toISOString().replace(/\.\d{3}Z$/, "Z");
 }
 
 const SKIP_FIELD_TYPES = new Set(["address", "location", "base64", "anytype"]);

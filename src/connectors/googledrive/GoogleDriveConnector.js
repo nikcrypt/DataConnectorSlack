@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { DataConnector } from "../base/DataConnector.js";
 import { GoogleDriveClient } from "./GoogleDriveClient.js";
+import { incrementalWindow } from "../base/incrementalWindow.js";
 
 const FOLDER_MIME = "application/vnd.google-apps.folder";
 const OBJECTS = ["drives", "files", "folders", "permissions"];
@@ -60,7 +61,12 @@ export class GoogleDriveConnector extends DataConnector {
     return record.sourceId;
   }
 
-  async *extract(object) {
+  getCheckpoint(object) {
+    if (object === "files" || object === "folders") return { type: "timestamp" };
+    return null;
+  }
+
+  async *extract(object, options = {}) {
     if (!OBJECTS.includes(object)) {
       throw new Error(`Unknown Google Drive object: ${object}`);
     }
@@ -70,10 +76,10 @@ export class GoogleDriveConnector extends DataConnector {
         yield* this.extractDrives();
         break;
       case "files":
-        yield* this.extractFiles();
+        yield* this.extractFiles(options);
         break;
       case "folders":
-        yield* this.extractFolders();
+        yield* this.extractFolders(options);
         break;
       case "permissions":
         yield* this.extractPermissions();
@@ -121,9 +127,9 @@ export class GoogleDriveConnector extends DataConnector {
     }
   }
 
-  async *extractFiles() {
+  async *extractFiles(options = {}) {
     const baseQ = "trashed = false and mimeType != 'application/vnd.google-apps.folder'";
-    const q = this.query ? `(${baseQ}) and (${this.query})` : baseQ;
+    const q = this.driveQuery(baseQ, options);
 
     for await (const file of this.client.listFiles({
       q,
@@ -133,13 +139,13 @@ export class GoogleDriveConnector extends DataConnector {
     }
 
     if (this.includeSharedDrives) {
-      yield* this.extractFromSharedDrives("files", baseQ);
+      yield* this.extractFromSharedDrives("files", q);
     }
   }
 
-  async *extractFolders() {
+  async *extractFolders(options = {}) {
     const baseQ = `trashed = false and mimeType = '${FOLDER_MIME}'`;
-    const q = this.query ? `(${baseQ}) and (${this.query})` : baseQ;
+    const q = this.driveQuery(baseQ, options);
 
     for await (const file of this.client.listFiles({
       q,
@@ -149,14 +155,24 @@ export class GoogleDriveConnector extends DataConnector {
     }
 
     if (this.includeSharedDrives) {
-      yield* this.extractFromSharedDrives("folders", baseQ);
+      yield* this.extractFromSharedDrives("folders", q);
     }
   }
 
-  async *extractFromSharedDrives(object, baseQ) {
+  driveQuery(baseQ, options) {
+    let q = baseQ;
+    const window = incrementalWindow(options);
+    if (window) {
+      console.log(`[googledrive] incremental modified from ${window.since.toISOString()} until ${window.until.toISOString()}`);
+      q = `(${q}) and modifiedTime >= '${window.since.toISOString()}' and modifiedTime < '${window.until.toISOString()}'`;
+    }
+    if (this.query) q = `(${q}) and (${this.query})`;
+    return q;
+  }
+
+  async *extractFromSharedDrives(object, q) {
     try {
       for await (const drive of this.client.listDrives()) {
-        const q = this.query ? `(${baseQ}) and (${this.query})` : baseQ;
         for await (const file of this.client.listFiles({
           q,
           driveId: drive.id,

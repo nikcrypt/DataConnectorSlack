@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { DataConnector } from "../base/DataConnector.js";
 import { JiraClient } from "./JiraClient.js";
+import { incrementalWindow } from "../base/incrementalWindow.js";
 
 const OBJECTS = ["projects", "issues", "users", "statuses", "issueTypes"];
 
@@ -49,7 +50,12 @@ export class JiraConnector extends DataConnector {
     return record.sourceId;
   }
 
-  async *extract(object) {
+  getCheckpoint(object) {
+    if (object === "issues") return { type: "timestamp" };
+    return null;
+  }
+
+  async *extract(object, options = {}) {
     if (!OBJECTS.includes(object)) {
       throw new Error(`Unknown Jira object: ${object}`);
     }
@@ -59,7 +65,7 @@ export class JiraConnector extends DataConnector {
         yield* this.extractProjects();
         break;
       case "issues":
-        yield* this.extractIssues();
+        yield* this.extractIssues(options);
         break;
       case "users":
         yield* this.extractUsers();
@@ -95,9 +101,14 @@ export class JiraConnector extends DataConnector {
     }
   }
 
-  async *extractIssues() {
+  async *extractIssues(options = {}) {
+    const window = incrementalWindow(options);
+    const jql = window ? jiraIncrementalJql(this.jql, window) : this.jql;
+    if (window) {
+      console.log(`[jira] incremental issues updated from ${window.since.toISOString()} until ${window.until.toISOString()}`);
+    }
     let count = 0;
-    for await (const issue of this.client.searchIssues(this.jql)) {
+    for await (const issue of this.client.searchIssues(jql)) {
       const fields = issue.fields || {};
       yield this.record("issues", issue.id || issue.key, {
         id: issue.id || null,
@@ -198,6 +209,17 @@ export class JiraConnector extends DataConnector {
     payload.hash = createHash("sha256").update(JSON.stringify(data)).digest("hex");
     return payload;
   }
+}
+
+function jiraIncrementalJql(baseJql, window) {
+  const filter = `updated >= "${jiraTime(window.since)}" AND updated < "${jiraTime(window.until)}"`;
+  const withoutOrder = String(baseJql || "").replace(/\s+ORDER BY[\s\S]*$/i, "").trim();
+  const body = withoutOrder ? `(${withoutOrder}) AND (${filter})` : filter;
+  return `${body} ORDER BY updated DESC`;
+}
+
+function jiraTime(date) {
+  return date.toISOString().slice(0, 16).replace("T", " ");
 }
 
 /** ADF or string description → plain text-ish */
