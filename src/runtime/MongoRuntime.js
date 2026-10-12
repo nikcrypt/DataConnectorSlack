@@ -45,14 +45,6 @@ export class MongoRuntime {
       const runs = db.collection("extraction_runs");
       const checkpoints = db.collection("extraction_checkpoints");
 
-      await records.createIndex(
-        { object: 1, sourceId: 1 },
-        { unique: true, name: "records_identity" }
-      );
-      await runs.createIndex(
-        { connectorKey: 1, startedAt: -1 },
-        { name: "runs_by_connector" }
-      );
       await runs.insertOne({
         runId,
         connectorKey: this.connectorKey,
@@ -60,6 +52,13 @@ export class MongoRuntime {
         mode,
         startedAt: runStartedAt,
         objects: {},
+      });
+      await createIndexUnlessPresent(records, { object: 1, sourceId: 1 }, {
+        unique: true,
+        name: "records_identity",
+      });
+      await createIndexUnlessPresent(runs, { connectorKey: 1, startedAt: -1 }, {
+        name: "runs_by_connector",
       });
 
       const objectCheckpoints = mode === "incremental"
@@ -226,6 +225,18 @@ async function loadCheckpoints(checkpoints, connectorKey, objects) {
     };
   }
   return result;
+}
+
+async function createIndexUnlessPresent(collection, keys, options) {
+  try {
+    await collection.createIndex(keys, options);
+  } catch (error) {
+    const alreadyThere = error?.code === 85
+      || error?.codeName === "IndexOptionsConflict"
+      || /same name as the requested index/i.test(String(error?.message || ""));
+    if (!alreadyThere) throw error;
+    console.log(`[mongo] keeping existing index ${options.name}`);
+  }
 }
 
 function databaseNameFromUri(uri) {
