@@ -178,6 +178,7 @@ export class MSSQLConnector extends DataConnector {
   }
 
   async *extractConstraints() {
+    const filter = this.client.schemaFilter(this.allowedSchemas, "sch.name");
     const queries = [
       {
         key: "primary_keys",
@@ -194,7 +195,7 @@ export class MSSQLConnector extends DataConnector {
           INNER JOIN sys.indexes idx ON kc.parent_object_id = idx.object_id AND kc.unique_index_id = idx.index_id
           INNER JOIN sys.index_columns ic ON idx.object_id = ic.object_id AND idx.index_id = ic.index_id
           INNER JOIN sys.columns col ON ic.object_id = col.object_id AND ic.column_id = col.column_id
-          WHERE kc.type = 'PK' AND sch.name NOT IN ('guest','INFORMATION_SCHEMA','sys')
+          WHERE kc.type = 'PK' AND sch.name NOT IN ('guest','INFORMATION_SCHEMA','sys') ${filter.clause}
           ORDER BY sch.name, tbl.name, ic.key_ordinal
         `,
       },
@@ -218,7 +219,7 @@ export class MSSQLConnector extends DataConnector {
           INNER JOIN sys.tables refTbl ON fkc.referenced_object_id = refTbl.object_id
           INNER JOIN sys.schemas refSch ON refTbl.schema_id = refSch.schema_id
           INNER JOIN sys.columns refCol ON fkc.referenced_object_id = refCol.object_id AND fkc.referenced_column_id = refCol.column_id
-          WHERE sch.name NOT IN ('guest','INFORMATION_SCHEMA','sys')
+          WHERE sch.name NOT IN ('guest','INFORMATION_SCHEMA','sys') ${filter.clause}
           ORDER BY sch.name, tbl.name, fk.name, fkc.constraint_column_id
         `,
       },
@@ -237,7 +238,7 @@ export class MSSQLConnector extends DataConnector {
           INNER JOIN sys.indexes idx ON kc.parent_object_id = idx.object_id AND kc.unique_index_id = idx.index_id
           INNER JOIN sys.index_columns ic ON idx.object_id = ic.object_id AND idx.index_id = ic.index_id
           INNER JOIN sys.columns col ON ic.object_id = col.object_id AND ic.column_id = col.column_id
-          WHERE kc.type = 'UQ' AND sch.name NOT IN ('guest','INFORMATION_SCHEMA','sys')
+          WHERE kc.type = 'UQ' AND sch.name NOT IN ('guest','INFORMATION_SCHEMA','sys') ${filter.clause}
           ORDER BY sch.name, tbl.name, kc.name, ic.key_ordinal
         `,
       },
@@ -253,7 +254,7 @@ export class MSSQLConnector extends DataConnector {
           FROM sys.check_constraints cc
           INNER JOIN sys.tables tbl ON cc.parent_object_id = tbl.object_id
           INNER JOIN sys.schemas sch ON tbl.schema_id = sch.schema_id
-          WHERE sch.name NOT IN ('guest','INFORMATION_SCHEMA','sys')
+          WHERE sch.name NOT IN ('guest','INFORMATION_SCHEMA','sys') ${filter.clause}
           ORDER BY sch.name, tbl.name, cc.name
         `,
       },
@@ -262,7 +263,15 @@ export class MSSQLConnector extends DataConnector {
     for (const query of queries) {
       const rows = await this.client.query(query.sql);
       for (const row of rows) {
-        const sourceId = `${row.schema_name}.${row.table_name}.${row.constraint_name || row.column_name || query.key}`;
+        const columnPart = row.column_name || "constraint";
+        const ordinal = row.key_ordinal ?? row.constraint_column_id ?? "";
+        const sourceId = [
+          row.schema_name,
+          row.table_name,
+          row.constraint_name || query.key,
+          columnPart,
+          ordinal,
+        ].filter((part) => part !== "" && part != null).join(".");
         yield this.record("constraints", sourceId, {
           constraintType: query.key,
           schemaName: row.schema_name,
@@ -299,6 +308,10 @@ export class MSSQLConnector extends DataConnector {
       WHERE t.is_ms_shipped = 0 ${filter.clause} ${whereClause}
       ORDER BY s.name, t.name
     `);
+
+    if (!this.schemaName && !this.tableName) {
+      console.log("[mssql] table_data will read every user table. Set MSSQL_SCHEMA and MSSQL_TABLE to limit it.");
+    }
 
     for (const table of tables) {
       const schemaName = table.schema_name;

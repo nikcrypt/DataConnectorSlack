@@ -102,7 +102,8 @@ export class WindowsConnector extends DataConnector {
   }
 
   getCheckpoint(object) {
-    return OBJECTS.includes(object) ? { strategy: "modifiedAt", version: 1 } : null;
+    if (object === "files" || object === "folders") return { type: "timestamp" };
+    return null;
   }
 
   async testConnection() {
@@ -115,11 +116,6 @@ export class WindowsConnector extends DataConnector {
 
   getSourceId(record) {
     return record.sourceId;
-  }
-
-  getCheckpoint(object) {
-    if (object === "files") return { type: "timestamp" };
-    return null;
   }
 
   async *extract(object, options = {}) {
@@ -141,7 +137,7 @@ export class WindowsConnector extends DataConnector {
         if (window) {
           console.log(`[windows] incremental files modified from ${window.since.toISOString()} until ${window.until.toISOString()}`);
         }
-        yield* this.walkFiles("", 0, window);
+        yield* this.walkFiles("", 0, window, checkpointTime);
       }
     } finally {
       await this.client.close();
@@ -174,24 +170,36 @@ export class WindowsConnector extends DataConnector {
     }
   }
 
-  async *walkFiles(relative, depth, window = null) {
-    if (this.seen >= this.maxFiles) return;
-    const entries = await this.client.list(relative);
-    for (const entry of entries) {
-      if (this.seen >= this.maxFiles) return;
-      const child = joinRelative(relative, entry.name);
-      if (entry.kind === "directory") {
-        if (depth + 1 < this.maxDepth) {
-          yield* this.walkFiles(child, depth + 1, window);
+  async *walkFiles(relative, depth, window = null, checkpointTime = null) {
+    if (this.reachedLimit()) return;
+    try {
+      for await (const entry of this.client.iterate(relative)) {
+        if (this.reachedLimit()) return;
+        const child = joinRelative(relative, entry.name);
+        if (entry.kind === "directory") {
+          if (this.canDescend(depth)) {
+            yield* this.walkFiles(child, depth + 1, window, checkpointTime);
+          }
+          continue;
         }
-        continue;
-      }
-      if (window && !inWindow(entry.modifiedAt, window)) continue;
-      if (entry.kind !== "file") {
+
         this.seen += 1;
+        if (window && entry.modifiedAt && !inWindow(entry.modifiedAt, window)) continue;
         if (!isChangedSince(entry.modifiedAt, checkpointTime)) continue;
-        if (entry.kind !== "file") {
-          const record = this.record("files", child, {
+
+        const record = entry.kind === "file"
+          ? this.record("files", child, {
+            kind: "file",
+            name: entry.name,
+            path: child,
+            ...fileMetadata(entry, child, this.client.target),
+            size: entry.size,
+            modifiedAt: entry.modifiedAt,
+            downloaded: false,
+            downloadPath: null,
+            skipReason: "metadata only",
+          })
+          : this.record("files", child, {
             kind: entry.kind,
             name: entry.name,
             path: child,
@@ -202,23 +210,6 @@ export class WindowsConnector extends DataConnector {
             downloadPath: null,
             skipReason: entry.kind === "symlink" ? "symlink" : entry.error || "unreadable",
           });
-          if (this.shouldYieldRecord(record)) yield record;
-          continue;
-        }
-
-        // Scans are metadata-only. The explicit download command remains
-        // available separately and continues to preserve its existing output.
-        const record = this.record("files", child, {
-          kind: "file",
-          name: entry.name,
-          path: child,
-          ...fileMetadata(entry, child, this.client.target),
-          size: entry.size,
-          modifiedAt: entry.modifiedAt,
-          downloaded: false,
-          downloadPath: null,
-          skipReason: "metadata only",
-        });
         if (this.shouldYieldRecord(record)) yield record;
       }
     } catch (err) {

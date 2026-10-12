@@ -9,6 +9,7 @@ import { BoxConnector } from "./connectors/box/BoxConnector.js";
 import { ConfluenceConnector } from "./connectors/confluence/ConfluenceConnector.js";
 import { OracleConnector } from "./connectors/oracle/OracleConnector.js";
 import { MysqlConnector } from "./connectors/mysql/MysqlConnector.js";
+import { MSSQLConnector } from "./connectors/mssql/MSSQLConnector.js";
 import { WindowsConnector } from "./connectors/windows/WindowsConnector.js";
 import { ConnectorRuntimeEngine } from "./runtime/ConnectorRuntimeEngine.js";
 import { MongoRuntime } from "./runtime/MongoRuntime.js";
@@ -88,12 +89,15 @@ function createConnector(name) {
       return Promise.resolve(OracleConnector.fromEnv());
     case "mysql":
       return Promise.resolve(MysqlConnector.fromEnv());
+    case "mssql":
+    case "sqlserver":
+      return Promise.resolve(MSSQLConnector.fromEnv());
     case "windows":
     case "windowsfs":
       return Promise.resolve(WindowsConnector.fromEnv());
     default:
       throw new Error(
-        `Unknown connector: ${name}. Use slack, postgres, mysql, sharepoint, salesforce, jira, googledrive, box, confluence, oracle, or windows.`
+        `Unknown connector: ${name}. Use slack, postgres, mysql, mssql, sharepoint, salesforce, jira, googledrive, box, confluence, oracle, or windows.`
       );
   }
 }
@@ -187,11 +191,11 @@ function printHelp() {
   console.log(`
 Data connector CLI
 
-  npm run test:connection -- --connector slack|postgres|mysql|oracle|sharepoint|salesforce|jira|googledrive|box|confluence|windows
+  npm run test:connection -- --connector slack|postgres|mysql|mssql|oracle|sharepoint|salesforce|jira|googledrive|box|confluence|windows
   npm run extract -- --connector mysql
   npm run extract -- --connector mysql --objects schemas,tables,columns
-  npm run extract:slack | extract:postgres | extract:mysql | extract:oracle | extract:sharepoint | extract:salesforce | extract:jira | extract:googledrive | extract:box | extract:confluence | extract:windows
-  npm run extract:slack:mongo | extract:postgres:mongo | extract:mysql:mongo | extract:oracle:mongo | extract:sharepoint:mongo | extract:salesforce:mongo | extract:jira:mongo | extract:googledrive:mongo | extract:box:mongo | extract:confluence:mongo | extract:windows:mongo
+  npm run extract:slack | extract:postgres | extract:mysql | extract:mssql | extract:oracle | extract:sharepoint | extract:salesforce | extract:jira | extract:googledrive | extract:box | extract:confluence | extract:windows
+  npm run extract:slack:mongo | extract:postgres:mongo | extract:mysql:mongo | extract:mssql:mongo | extract:oracle:mongo | extract:sharepoint:mongo | extract:salesforce:mongo | extract:jira:mongo | extract:googledrive:mongo | extract:box:mongo | extract:confluence:mongo | extract:windows:mongo
   npm run extract:slack:mongo:incremental
 
 Slack:
@@ -204,6 +208,10 @@ Postgres:
 MySQL:
   MYSQL_URL or HOST/USER/PASSWORD
   Optional: MYSQL_DATABASE, MYSQL_PORT, MYSQL_SSL, MYSQL_SCHEMAS
+
+SQL Server:
+  MSSQL_HOST, MSSQL_USER, MSSQL_PASSWORD, MSSQL_DATABASE
+  Optional: MSSQL_PORT, MSSQL_SCHEMAS, MSSQL_SCHEMA, MSSQL_TABLE, MSSQL_PAGE_SIZE
 
 Oracle:
   ORACLE_USER + ORACLE_PASSWORD + ORACLE_CONNECT_STRING

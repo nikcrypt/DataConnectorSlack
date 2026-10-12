@@ -33,6 +33,9 @@
     "extract:postgres:mongo": "node src/cli.js extract-mongo --connector postgres",
     "extract:mysql": "node src/cli.js extract --connector mysql",
     "extract:mysql:mongo": "node src/cli.js extract-mongo --connector mysql",
+    "test:mssql": "node src/cli.js test --connector mssql",
+    "extract:mssql": "node src/cli.js extract --connector mssql",
+    "extract:mssql:mongo": "node src/cli.js extract-mongo --connector mssql",
     "extract:oracle": "node src/cli.js extract --connector oracle",
     "extract:oracle:mongo": "node src/cli.js extract-mongo --connector oracle",
     "extract:sharepoint": "node src/cli.js extract --connector sharepoint",
@@ -66,6 +69,7 @@
     "@marsaud/smb2": "^0.16.0",
     "dotenv": "^16.4.7",
     "mongodb": "^6.21.0",
+    "mssql": "^11.0.2",
     "mysql2": "^3.24.5",
     "oracledb": "^6.10.0",
     "pg": "^8.13.1"
