@@ -253,9 +253,10 @@ export class SlackConnector extends DataConnector {
     const oldest = this.oldestTs();
     const checkpoints = options.checkpoint?.channels || {};
     const watermark = options.checkpoint?.since || options.checkpoint?.lastSuccessfulAt;
-    const until = options.checkpoint?.until || (options.mode === "incremental" ? options.startedAt : undefined);
     const since = watermark ? slackTs(watermark) : undefined;
-    const latest = until ? slackTs(until) : undefined;
+    if (options.mode === "incremental" && since) {
+      console.log(`[slack] incremental messages posted after ${new Date(watermark).toISOString()}`);
+    }
 
     for (const channelId of channelIds) {
       const channelOldest = checkpoints[channelId]?.latest_ts
@@ -266,8 +267,7 @@ export class SlackConnector extends DataConnector {
         for await (const message of this.client.paginate("conversations.history", "messages", {
           channel: channelId,
           oldest: channelOldest,
-          latest,
-          inclusive: false,
+          inclusive: true,
         })) {
           // Skip thread replies here — they come from conversations.replies
           if (message.thread_ts && message.thread_ts !== message.ts) continue;
