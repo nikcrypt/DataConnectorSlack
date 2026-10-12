@@ -1,8 +1,10 @@
 import { createHash } from "node:crypto";
 import { DataConnector } from "../base/DataConnector.js";
+import { incrementalWindow } from "../base/incrementalWindow.js";
 import { OracleClient } from "./OracleClient.js";
 
 const OBJECTS = ["schemas", "tables", "views", "columns"];
+const CHECKPOINT_OBJECTS = new Set(["tables", "views", "columns"]);
 
 /**
  * Oracle metadata connector.
@@ -53,24 +55,30 @@ export class OracleConnector extends DataConnector {
     return record.sourceId;
   }
 
-  async *extract(object) {
+  getCheckpoint(object) {
+    if (CHECKPOINT_OBJECTS.has(object)) return { type: "timestamp" };
+    return null;
+  }
+
+  async *extract(object, options = {}) {
     if (!OBJECTS.includes(object)) {
       throw new Error(`Unknown Oracle object: ${object}`);
     }
 
     try {
+      const catalogWindow = object === "schemas" ? null : await this.catalogWindow(options);
       switch (object) {
         case "schemas":
           yield* this.extractSchemas();
           break;
         case "tables":
-          yield* this.extractTables();
+          yield* this.extractTables(catalogWindow);
           break;
         case "views":
-          yield* this.extractViews();
+          yield* this.extractViews(catalogWindow);
           break;
         case "columns":
-          yield* this.extractColumns();
+          yield* this.extractColumns(catalogWindow);
           break;
         default:
           throw new Error(`Extract not implemented for ${object}`);
@@ -98,14 +106,36 @@ export class OracleConnector extends DataConnector {
     }
   }
 
-  async *extractTables() {
-    const filter = this.client.ownerFilter(this.allowedSchemas, "owner");
+  async catalogWindow(options) {
+    const window = incrementalWindow(options);
+    if (!window) return null;
+    const rows = await this.client.query(`
+      SELECT (SYSDATE - CAST(SYS_EXTRACT_UTC(SYSTIMESTAMP) AS DATE)) * 1440 AS offset_minutes
+      FROM dual
+    `);
+    const offsetMs = Math.round(Number(rows[0]?.OFFSET_MINUTES || 0)) * 60 * 1000;
+    console.log(
+      `[oracle] incremental catalog changes from ${window.since.toISOString()} until ${window.until.toISOString()}`
+    );
+    return {
+      since: new Date(window.since.getTime() + offsetMs),
+      until: new Date(window.until.getTime() + offsetMs),
+    };
+  }
+
+  async *extractTables(window = null) {
+    const filter = this.client.ownerFilter(this.allowedSchemas, "t.owner");
     const sql = `
-      SELECT owner, table_name, tablespace_name, num_rows
-      FROM all_tables
+      SELECT t.owner, t.table_name, t.tablespace_name, t.num_rows, o.created, o.last_ddl_time
+      FROM all_tables t
+      INNER JOIN all_objects o
+        ON o.owner = t.owner
+       AND o.object_name = t.table_name
+       AND o.object_type = 'TABLE'
       WHERE 1 = 1
       ${filter.clause}
-      ORDER BY owner, table_name
+      ${ddlClause(window, "o")}
+      ORDER BY t.owner, t.table_name
     `;
     const rows = await this.client.query(sql, filter.binds);
 
@@ -116,18 +146,25 @@ export class OracleConnector extends DataConnector {
         tableName: row.TABLE_NAME,
         tablespaceName: row.TABLESPACE_NAME || null,
         numRows: row.NUM_ROWS ?? null,
+        created: isoDate(row.CREATED),
+        lastDdlTime: isoDate(row.LAST_DDL_TIME),
       }, row);
     }
   }
 
-  async *extractViews() {
-    const filter = this.client.ownerFilter(this.allowedSchemas, "owner");
+  async *extractViews(window = null) {
+    const filter = this.client.ownerFilter(this.allowedSchemas, "v.owner");
     const sql = `
-      SELECT owner, view_name
-      FROM all_views
+      SELECT v.owner, v.view_name, o.created, o.last_ddl_time
+      FROM all_views v
+      INNER JOIN all_objects o
+        ON o.owner = v.owner
+       AND o.object_name = v.view_name
+       AND o.object_type = 'VIEW'
       WHERE 1 = 1
       ${filter.clause}
-      ORDER BY owner, view_name
+      ${ddlClause(window, "o")}
+      ORDER BY v.owner, v.view_name
     `;
     const rows = await this.client.query(sql, filter.binds);
 
@@ -136,29 +173,38 @@ export class OracleConnector extends DataConnector {
       yield this.record("views", sourceId, {
         schemaName: row.OWNER,
         viewName: row.VIEW_NAME,
+        created: isoDate(row.CREATED),
+        lastDdlTime: isoDate(row.LAST_DDL_TIME),
       }, row);
     }
   }
 
-  async *extractColumns() {
-    const filter = this.client.ownerFilter(this.allowedSchemas, "owner");
+  async *extractColumns(window = null) {
+    const filter = this.client.ownerFilter(this.allowedSchemas, "c.owner");
     // DATA_DEFAULT is a LONG and is omitted — thin-mode fetches of LONG are unreliable.
     const sql = `
       SELECT
-        owner,
-        table_name,
-        column_name,
-        column_id,
-        data_type,
-        data_length,
-        data_precision,
-        data_scale,
-        nullable,
-        char_length
-      FROM all_tab_columns
+        c.owner,
+        c.table_name,
+        c.column_name,
+        c.column_id,
+        c.data_type,
+        c.data_length,
+        c.data_precision,
+        c.data_scale,
+        c.nullable,
+        c.char_length,
+        o.created,
+        o.last_ddl_time
+      FROM all_tab_columns c
+      INNER JOIN all_objects o
+        ON o.owner = c.owner
+       AND o.object_name = c.table_name
+       AND o.object_type IN ('TABLE', 'VIEW', 'MATERIALIZED VIEW')
       WHERE 1 = 1
       ${filter.clause}
-      ORDER BY owner, table_name, column_id
+      ${ddlClause(window, "o")}
+      ORDER BY c.owner, c.table_name, c.column_id
     `;
     const rows = await this.client.query(sql, filter.binds);
 
@@ -175,6 +221,8 @@ export class OracleConnector extends DataConnector {
         dataScale: row.DATA_SCALE ?? null,
         nullable: row.NULLABLE === "Y",
         characterMaxLength: row.CHAR_LENGTH ?? null,
+        created: isoDate(row.CREATED),
+        lastDdlTime: isoDate(row.LAST_DDL_TIME),
       }, row);
     }
   }
@@ -192,4 +240,28 @@ export class OracleConnector extends DataConnector {
     payload.hash = createHash("sha256").update(JSON.stringify(data)).digest("hex");
     return payload;
   }
+}
+
+function ddlClause(window, alias) {
+  if (!window) return "";
+  const since = sqlDateLiteral(window.since);
+  const until = sqlDateLiteral(window.until);
+  return `AND (
+    (${alias}.last_ddl_time >= TO_DATE('${since}', 'YYYY-MM-DD HH24:MI:SS') AND ${alias}.last_ddl_time < TO_DATE('${until}', 'YYYY-MM-DD HH24:MI:SS'))
+    OR (${alias}.created >= TO_DATE('${since}', 'YYYY-MM-DD HH24:MI:SS') AND ${alias}.created < TO_DATE('${until}', 'YYYY-MM-DD HH24:MI:SS'))
+  )`;
+}
+
+function sqlDateLiteral(date) {
+  const pad = (value, width = 2) => String(value).padStart(width, "0");
+  const day = `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}`;
+  const time = `${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}:${pad(date.getUTCSeconds())}`;
+  return `${day} ${time}`;
+}
+
+function isoDate(value) {
+  if (!value) return null;
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toISOString();
 }

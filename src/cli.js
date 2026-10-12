@@ -197,6 +197,8 @@ Data connector CLI
   npm run extract:slack | extract:postgres | extract:mysql | extract:mssql | extract:oracle | extract:sharepoint | extract:salesforce | extract:jira | extract:googledrive | extract:box | extract:confluence | extract:windows
   npm run extract:slack:mongo | extract:postgres:mongo | extract:mysql:mongo | extract:mssql:mongo | extract:oracle:mongo | extract:sharepoint:mongo | extract:salesforce:mongo | extract:jira:mongo | extract:googledrive:mongo | extract:box:mongo | extract:confluence:mongo | extract:windows:mongo
   npm run extract:slack:mongo:incremental
+  npm run extract:mssql:mongo:incremental
+  npm run extract:oracle:mongo:incremental
 
 Slack:
   SLACK_BOT_TOKEN
@@ -211,7 +213,7 @@ MySQL:
 
 SQL Server:
   MSSQL_HOST, MSSQL_USER, MSSQL_PASSWORD, MSSQL_DATABASE
-  Optional: MSSQL_PORT, MSSQL_SCHEMAS, MSSQL_SCHEMA, MSSQL_TABLE, MSSQL_PAGE_SIZE
+  Optional: MSSQL_PORT, MSSQL_SCHEMAS, MSSQL_SCHEMA, MSSQL_TABLE, MSSQL_PAGE_SIZE, MSSQL_MODIFIED_COLUMN
 
 Oracle:
   ORACLE_USER + ORACLE_PASSWORD + ORACLE_CONNECT_STRING

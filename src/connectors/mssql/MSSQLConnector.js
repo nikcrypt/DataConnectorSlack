@@ -1,8 +1,22 @@
 import { createHash } from "node:crypto";
 import { DataConnector } from "../base/DataConnector.js";
+import { incrementalWindow } from "../base/incrementalWindow.js";
 import { MSSQLClient } from "./MSSQLClient.js";
 
 const OBJECTS = ["schemas", "tables", "columns", "constraints", "table_data"];
+const CHECKPOINT_OBJECTS = new Set(["tables", "columns", "constraints", "table_data"]);
+const DATE_TYPES = new Set(["datetime", "datetime2", "datetimeoffset", "smalldatetime", "date"]);
+const MODIFIED_COLUMN_NAMES = [
+  "ModifiedDate",
+  "LastModifiedDate",
+  "LastModified",
+  "UpdatedAt",
+  "UpdatedDate",
+  "ModifiedAt",
+  "UpdateDate",
+  "modified_at",
+  "updated_at",
+];
 
 export class MSSQLConnector extends DataConnector {
   constructor(config) {
@@ -14,6 +28,7 @@ export class MSSQLConnector extends DataConnector {
       : 1000;
     this.schemaName = config.schemaName || null;
     this.tableName = config.tableName || null;
+    this.modifiedColumn = config.modifiedColumn || null;
   }
 
   static fromEnv() {
@@ -31,6 +46,7 @@ export class MSSQLConnector extends DataConnector {
       pageSize: Number.isFinite(pageSize) && pageSize > 0 ? pageSize : 1000,
       schemaName: explicitSchema,
       tableName: explicitTable,
+      modifiedColumn: process.env.MSSQL_MODIFIED_COLUMN?.trim() || null,
     });
   }
 
@@ -54,27 +70,35 @@ export class MSSQLConnector extends DataConnector {
     return record.sourceId;
   }
 
-  async *extract(object) {
+  getCheckpoint(object) {
+    if (CHECKPOINT_OBJECTS.has(object)) return { type: "timestamp" };
+    return null;
+  }
+
+  async *extract(object, options = {}) {
     if (!OBJECTS.includes(object)) {
       throw new Error(`Unknown MSSQL object: ${object}`);
     }
 
     try {
+      const catalogWindow = object === "schemas" || object === "table_data"
+        ? null
+        : await this.catalogWindow(options);
       switch (object) {
         case "schemas":
           yield* this.extractSchemas();
           break;
         case "tables":
-          yield* this.extractTables();
+          yield* this.extractTables(catalogWindow);
           break;
         case "columns":
-          yield* this.extractColumns();
+          yield* this.extractColumns(catalogWindow);
           break;
         case "constraints":
-          yield* this.extractConstraints();
+          yield* this.extractConstraints(catalogWindow);
           break;
         case "table_data":
-          yield* this.extractTableData();
+          yield* this.extractTableData(options);
           break;
         default:
           throw new Error(`Extract not implemented for ${object}`);
@@ -101,7 +125,7 @@ export class MSSQLConnector extends DataConnector {
     }
   }
 
-  async *extractTables() {
+  async *extractTables(window = null) {
     const filter = this.client.schemaFilter(this.allowedSchemas, "s.name");
     const rows = await this.client.query(`
       SELECT
@@ -112,7 +136,7 @@ export class MSSQLConnector extends DataConnector {
         t.modify_date AS modify_date
       FROM sys.tables t
       INNER JOIN sys.schemas s ON t.schema_id = s.schema_id
-      WHERE t.is_ms_shipped = 0 ${filter.clause}
+      WHERE t.is_ms_shipped = 0 ${filter.clause} ${changeClause(window, "t")}
       ORDER BY s.name, t.name
     `);
 
@@ -128,7 +152,7 @@ export class MSSQLConnector extends DataConnector {
     }
   }
 
-  async *extractColumns() {
+  async *extractColumns(window = null) {
     const filter = this.client.schemaFilter(this.allowedSchemas, "s.name");
     const rows = await this.client.query(`
       SELECT
@@ -151,7 +175,7 @@ export class MSSQLConnector extends DataConnector {
       INNER JOIN sys.tables t ON c.object_id = t.object_id
       INNER JOIN sys.schemas s ON t.schema_id = s.schema_id
       LEFT JOIN sys.default_constraints dc ON c.default_object_id = dc.object_id
-      WHERE t.is_ms_shipped = 0 ${filter.clause}
+      WHERE t.is_ms_shipped = 0 ${filter.clause} ${changeClause(window, "t")}
       ORDER BY s.name, t.name, c.column_id
     `);
 
@@ -177,7 +201,7 @@ export class MSSQLConnector extends DataConnector {
     }
   }
 
-  async *extractConstraints() {
+  async *extractConstraints(window = null) {
     const filter = this.client.schemaFilter(this.allowedSchemas, "sch.name");
     const queries = [
       {
@@ -195,7 +219,7 @@ export class MSSQLConnector extends DataConnector {
           INNER JOIN sys.indexes idx ON kc.parent_object_id = idx.object_id AND kc.unique_index_id = idx.index_id
           INNER JOIN sys.index_columns ic ON idx.object_id = ic.object_id AND idx.index_id = ic.index_id
           INNER JOIN sys.columns col ON ic.object_id = col.object_id AND ic.column_id = col.column_id
-          WHERE kc.type = 'PK' AND sch.name NOT IN ('guest','INFORMATION_SCHEMA','sys') ${filter.clause}
+          WHERE kc.type = 'PK' AND sch.name NOT IN ('guest','INFORMATION_SCHEMA','sys') ${filter.clause} ${changeClause(window, "kc")}
           ORDER BY sch.name, tbl.name, ic.key_ordinal
         `,
       },
@@ -219,7 +243,7 @@ export class MSSQLConnector extends DataConnector {
           INNER JOIN sys.tables refTbl ON fkc.referenced_object_id = refTbl.object_id
           INNER JOIN sys.schemas refSch ON refTbl.schema_id = refSch.schema_id
           INNER JOIN sys.columns refCol ON fkc.referenced_object_id = refCol.object_id AND fkc.referenced_column_id = refCol.column_id
-          WHERE sch.name NOT IN ('guest','INFORMATION_SCHEMA','sys') ${filter.clause}
+          WHERE sch.name NOT IN ('guest','INFORMATION_SCHEMA','sys') ${filter.clause} ${changeClause(window, "fk")}
           ORDER BY sch.name, tbl.name, fk.name, fkc.constraint_column_id
         `,
       },
@@ -238,7 +262,7 @@ export class MSSQLConnector extends DataConnector {
           INNER JOIN sys.indexes idx ON kc.parent_object_id = idx.object_id AND kc.unique_index_id = idx.index_id
           INNER JOIN sys.index_columns ic ON idx.object_id = ic.object_id AND idx.index_id = ic.index_id
           INNER JOIN sys.columns col ON ic.object_id = col.object_id AND ic.column_id = col.column_id
-          WHERE kc.type = 'UQ' AND sch.name NOT IN ('guest','INFORMATION_SCHEMA','sys') ${filter.clause}
+          WHERE kc.type = 'UQ' AND sch.name NOT IN ('guest','INFORMATION_SCHEMA','sys') ${filter.clause} ${changeClause(window, "kc")}
           ORDER BY sch.name, tbl.name, kc.name, ic.key_ordinal
         `,
       },
@@ -254,7 +278,7 @@ export class MSSQLConnector extends DataConnector {
           FROM sys.check_constraints cc
           INNER JOIN sys.tables tbl ON cc.parent_object_id = tbl.object_id
           INNER JOIN sys.schemas sch ON tbl.schema_id = sch.schema_id
-          WHERE sch.name NOT IN ('guest','INFORMATION_SCHEMA','sys') ${filter.clause}
+          WHERE sch.name NOT IN ('guest','INFORMATION_SCHEMA','sys') ${filter.clause} ${changeClause(window, "cc")}
           ORDER BY sch.name, tbl.name, cc.name
         `,
       },
@@ -289,7 +313,7 @@ export class MSSQLConnector extends DataConnector {
     }
   }
 
-  async *extractTableData() {
+  async *extractTableData(options = {}) {
     const filter = this.client.schemaFilter(this.allowedSchemas, "s.name");
     const baseWhere = [];
     if (this.schemaName) {
@@ -309,13 +333,21 @@ export class MSSQLConnector extends DataConnector {
       ORDER BY s.name, t.name
     `);
 
-    if (!this.schemaName && !this.tableName) {
+    const window = incrementalWindow(options);
+    if (!window && !this.schemaName && !this.tableName) {
       console.log("[mssql] table_data will read every user table. Set MSSQL_SCHEMA and MSSQL_TABLE to limit it.");
+    }
+    if (window) {
+      console.log(`[mssql] incremental table rows modified from ${window.since.toISOString()} until ${window.until.toISOString()}`);
     }
 
     for (const table of tables) {
       const schemaName = table.schema_name;
       const tableName = table.table_name;
+      if (window) {
+        yield* this.extractChangedRows(schemaName, tableName, window);
+        continue;
+      }
       const fullTableName = `${quoteIdentifier(schemaName)}.${quoteIdentifier(tableName)}`;
       const tableColumns = await this.client.getTableColumns(schemaName, tableName);
       const orderBy = tableColumns.length
@@ -375,6 +407,136 @@ export class MSSQLConnector extends DataConnector {
     }
   }
 
+  async catalogWindow(options) {
+    const window = incrementalWindow(options);
+    if (!window) return null;
+    const rows = await this.client.query(`
+      SELECT DATEDIFF(MINUTE, SYSUTCDATETIME(), SYSDATETIME()) AS offset_minutes
+    `);
+    const offsetMs = Number(rows[0]?.offset_minutes || 0) * 60 * 1000;
+    console.log(
+      `[mssql] incremental catalog changes from ${window.since.toISOString()} until ${window.until.toISOString()}`
+    );
+    return {
+      since: new Date(window.since.getTime() + offsetMs),
+      until: new Date(window.until.getTime() + offsetMs),
+    };
+  }
+
+  async *extractChangedRows(schemaName, tableName, window) {
+    const column = await this.findModifiedColumn(schemaName, tableName);
+    const qualified = `${schemaName}.${tableName}`;
+    if (!column) {
+      console.log(
+        `[mssql] incremental table_data skipped ${qualified}: no datetime modified column. Set MSSQL_MODIFIED_COLUMN.`
+      );
+      return;
+    }
+
+    const fullTableName = `${quoteIdentifier(schemaName)}.${quoteIdentifier(tableName)}`;
+    const quotedColumn = quoteIdentifier(column);
+    const rowFilter = `${quotedColumn} >= '${sqlDateLiteral(window.since)}' AND ${quotedColumn} < '${sqlDateLiteral(window.until)}'`;
+    console.log(`[mssql] incremental ${qualified} using ${column}`);
+
+    const tableColumns = await this.client.getTableColumns(schemaName, tableName);
+    const pkColumns = await this.primaryKeyColumns(schemaName, tableName);
+    const orderColumns = pkColumns.length ? pkColumns : tableColumns;
+    const orderBy = orderColumns.length
+      ? orderColumns.map((name) => quoteIdentifier(name)).join(", ")
+      : "1";
+    const totalRowsResult = await this.client.query(
+      `SELECT COUNT(*) AS total_rows FROM ${fullTableName} WHERE ${rowFilter}`
+    );
+    const totalRows = Number(totalRowsResult[0]?.total_rows || 0);
+    let offset = 0;
+
+    while (offset < totalRows) {
+      const pageRows = await this.client.query(`
+        SELECT * FROM ${fullTableName}
+        WHERE ${rowFilter}
+        ORDER BY ${orderBy}
+        OFFSET ${offset} ROWS FETCH NEXT ${this.pageSize} ROWS ONLY
+      `);
+      if (!pageRows.length) break;
+
+      const columns = tableColumns.length ? tableColumns : Object.keys(pageRows[0] || {});
+      for (const row of pageRows) {
+        const dataRow = {};
+        for (const name of columns) {
+          dataRow[name] = serializeValue(row[name]);
+        }
+        const primaryKey = {};
+        for (const name of pkColumns) primaryKey[name] = dataRow[name];
+        const identity = pkColumns.length ? pkColumns.map((name) => dataRow[name]) : [dataRow];
+        const sourceId = `${qualified}.${createHash("sha256").update(JSON.stringify(identity)).digest("hex")}`;
+        yield this.record("table_data", sourceId, {
+          schemaName,
+          tableName,
+          pageNumber: null,
+          pageSize: 1,
+          offset: null,
+          totalRows,
+          rowCount: 1,
+          columns,
+          rows: [dataRow],
+          hasMore: false,
+          incremental: true,
+          modifiedColumn: column,
+          primaryKey: pkColumns.length ? primaryKey : null,
+        }, {
+          schemaName,
+          tableName,
+          modifiedColumn: column,
+          row: dataRow,
+        });
+      }
+      offset += pageRows.length;
+    }
+  }
+
+  async findModifiedColumn(schemaName, tableName) {
+    const rows = await this.client.query(`
+      SELECT c.name AS column_name, TYPE_NAME(c.user_type_id) AS data_type
+      FROM sys.columns c
+      INNER JOIN sys.tables t ON c.object_id = t.object_id
+      INNER JOIN sys.schemas s ON t.schema_id = s.schema_id
+      WHERE s.name = '${escapeLiteral(schemaName)}'
+        AND t.name = '${escapeLiteral(tableName)}'
+    `);
+    const wanted = this.modifiedColumn ? [this.modifiedColumn] : MODIFIED_COLUMN_NAMES;
+    const byName = new Map(rows.map((row) => [String(row.column_name).toLowerCase(), row]));
+    for (const name of wanted) {
+      const row = byName.get(name.toLowerCase());
+      if (!row) continue;
+      if (!DATE_TYPES.has(String(row.data_type).toLowerCase())) {
+        if (this.modifiedColumn) {
+          console.log(
+            `[mssql] ${schemaName}.${tableName}.${row.column_name} is ${row.data_type}, not a date column`
+          );
+        }
+        continue;
+      }
+      return row.column_name;
+    }
+    return null;
+  }
+
+  async primaryKeyColumns(schemaName, tableName) {
+    const rows = await this.client.query(`
+      SELECT col.name AS column_name
+      FROM sys.indexes i
+      INNER JOIN sys.index_columns ic ON i.object_id = ic.object_id AND i.index_id = ic.index_id
+      INNER JOIN sys.columns col ON ic.object_id = col.object_id AND ic.column_id = col.column_id
+      INNER JOIN sys.tables t ON i.object_id = t.object_id
+      INNER JOIN sys.schemas s ON t.schema_id = s.schema_id
+      WHERE i.is_primary_key = 1
+        AND s.name = '${escapeLiteral(schemaName)}'
+        AND t.name = '${escapeLiteral(tableName)}'
+      ORDER BY ic.key_ordinal
+    `);
+    return rows.map((row) => row.column_name);
+  }
+
   record(object, sourceId, data, raw) {
     const payload = {
       connectorKey: "mssql",
@@ -392,6 +554,24 @@ export class MSSQLConnector extends DataConnector {
 
 function quoteIdentifier(name) {
   return `[${String(name).replace(/]/g, "]]")}]`;
+}
+
+function escapeLiteral(value) {
+  return String(value || "").replace(/'/g, "''");
+}
+
+function changeClause(window, alias) {
+  if (!window) return "";
+  const since = sqlDateLiteral(window.since);
+  const until = sqlDateLiteral(window.until);
+  return `AND ((${alias}.modify_date >= '${since}' AND ${alias}.modify_date < '${until}') OR (${alias}.create_date >= '${since}' AND ${alias}.create_date < '${until}'))`;
+}
+
+function sqlDateLiteral(date) {
+  const pad = (value, width = 2) => String(value).padStart(width, "0");
+  const day = `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}`;
+  const time = `${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}:${pad(date.getUTCSeconds())}.${pad(date.getUTCMilliseconds(), 3)}`;
+  return `${day} ${time}`;
 }
 
 function serializeValue(value) {
