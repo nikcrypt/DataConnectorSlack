@@ -19,6 +19,7 @@
     "test:googledrive": "node src/cli.js test --connector googledrive",
     "test:box": "node src/cli.js test --connector box",
     "test:confluence": "node src/cli.js test --connector confluence",
+    "test:servicenow": "node src/cli.js test --connector servicenow",
     "extract": "node src/cli.js extract",
     "extract:slack": "node src/cli.js extract --connector slack",
     "extract:slack:mongo": "node src/cli.js extract-mongo --connector slack",
@@ -33,7 +34,6 @@
     "extract:postgres:mongo": "node src/cli.js extract-mongo --connector postgres",
     "extract:mysql": "node src/cli.js extract --connector mysql",
     "extract:mysql:mongo": "node src/cli.js extract-mongo --connector mysql",
-    "extract:mysql:mongo:incremental": "node src/cli.js extract-mongo --connector mysql --mode incremental --objects tables,columns",
     "test:mssql": "node src/cli.js test --connector mssql",
     "extract:mssql": "node src/cli.js extract --connector mssql",
     "extract:mssql:mongo": "node src/cli.js extract-mongo --connector mssql",
@@ -47,6 +47,9 @@
     "extract:salesforce:mongo": "node src/cli.js extract-mongo --connector salesforce",
     "extract:jira": "node src/cli.js extract --connector jira",
     "extract:jira:mongo": "node src/cli.js extract-mongo --connector jira",
+    "extract:servicenow": "node src/cli.js extract --connector servicenow",
+    "extract:servicenow:mongo": "node src/cli.js extract-mongo --connector servicenow",
+    "extract:servicenow:mongo:incremental": "node src/cli.js extract-mongo --connector servicenow --mode incremental",
     "extract:googledrive": "node src/cli.js extract --connector googledrive",
     "extract:googledrive:mongo": "node src/cli.js extract-mongo --connector googledrive",
     "extract:box": "node src/cli.js extract --connector box",
@@ -78,3 +81,4 @@
     "pg": "^8.13.1"
   }
 }
+
