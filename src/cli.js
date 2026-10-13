@@ -199,6 +199,7 @@ Data connector CLI
   npm run extract:slack:mongo:incremental
   npm run extract:mssql:mongo:incremental
   npm run extract:oracle:mongo:incremental
+  npm run extract:mysql:mongo:incremental
 
 Slack:
   SLACK_BOT_TOKEN

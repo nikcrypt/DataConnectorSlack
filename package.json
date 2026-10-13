@@ -33,6 +33,7 @@
     "extract:postgres:mongo": "node src/cli.js extract-mongo --connector postgres",
     "extract:mysql": "node src/cli.js extract --connector mysql",
     "extract:mysql:mongo": "node src/cli.js extract-mongo --connector mysql",
+    "extract:mysql:mongo:incremental": "node src/cli.js extract-mongo --connector mysql --mode incremental --objects tables,columns",
     "test:mssql": "node src/cli.js test --connector mssql",
     "extract:mssql": "node src/cli.js extract --connector mssql",
     "extract:mssql:mongo": "node src/cli.js extract-mongo --connector mssql",
