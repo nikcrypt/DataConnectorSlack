@@ -11,6 +11,7 @@ import { OracleConnector } from "./connectors/oracle/OracleConnector.js";
 import { MysqlConnector } from "./connectors/mysql/MysqlConnector.js";
 import { MSSQLConnector } from "./connectors/mssql/MSSQLConnector.js";
 import { WindowsConnector } from "./connectors/windows/WindowsConnector.js";
+import { ServiceNowConnector } from "./connectors/servicenow/ServiceNowConnector.js";
 import { ConnectorRuntimeEngine } from "./runtime/ConnectorRuntimeEngine.js";
 import { MongoRuntime } from "./runtime/MongoRuntime.js";
 import { loadSlackAuth, getBotTokenFromEnvOrAuth } from "./connectors/slack/tokenStore.js";
@@ -95,9 +96,12 @@ function createConnector(name) {
     case "windows":
     case "windowsfs":
       return Promise.resolve(WindowsConnector.fromEnv());
+    case "servicenow":
+    case "service-now":
+      return Promise.resolve(ServiceNowConnector.fromEnv());
     default:
       throw new Error(
-        `Unknown connector: ${name}. Use slack, postgres, mysql, mssql, sharepoint, salesforce, jira, googledrive, box, confluence, oracle, or windows.`
+        `Unknown connector: ${name}. Use slack, postgres, mysql, mssql, sharepoint, salesforce, jira, googledrive, box, confluence, oracle, windows, or servicenow.`
       );
   }
 }
@@ -191,15 +195,17 @@ function printHelp() {
   console.log(`
 Data connector CLI
 
-  npm run test:connection -- --connector slack|postgres|mysql|mssql|oracle|sharepoint|salesforce|jira|googledrive|box|confluence|windows
+  npm run test:connection -- --connector slack|postgres|mysql|mssql|oracle|sharepoint|salesforce|jira|googledrive|box|confluence|windows|servicenow
   npm run extract -- --connector mysql
   npm run extract -- --connector mysql --objects schemas,tables,columns
-  npm run extract:slack | extract:postgres | extract:mysql | extract:mssql | extract:oracle | extract:sharepoint | extract:salesforce | extract:jira | extract:googledrive | extract:box | extract:confluence | extract:windows
-  npm run extract:slack:mongo | extract:postgres:mongo | extract:mysql:mongo | extract:mssql:mongo | extract:oracle:mongo | extract:sharepoint:mongo | extract:salesforce:mongo | extract:jira:mongo | extract:googledrive:mongo | extract:box:mongo | extract:confluence:mongo | extract:windows:mongo
+  npm run extract:slack | extract:postgres | extract:mysql | extract:mssql | extract:oracle | extract:sharepoint | extract:salesforce | extract:jira | extract:googledrive | extract:box | extract:confluence | extract:windows | extract:servicenow
+  npm run extract:slack:mongo | extract:postgres:mongo | extract:mysql:mongo | extract:mssql:mongo | extract:oracle:mongo | extract:sharepoint:mongo | extract:salesforce:mongo | extract:jira:mongo | extract:googledrive:mongo | extract:box:mongo | extract:confluence:mongo | extract:windows:mongo | extract:servicenow:mongo
   npm run extract:slack:mongo:incremental
   npm run extract:mssql:mongo:incremental
   npm run extract:oracle:mongo:incremental
   npm run extract:mysql:mongo:incremental
+  npm run extract:postgres:mongo:incremental
+  npm run extract:servicenow:mongo:incremental
 
 Slack:
   SLACK_BOT_TOKEN
@@ -207,6 +213,14 @@ Slack:
 
 Postgres:
   POSTGRES_URL or HOST/DATABASE/USER/PASSWORD
+  Optional: POSTGRES_SCHEMAS
+  Incremental view changes need track_commit_timestamp=on on the server
+
+ServiceNow:
+  SERVICENOW_BASE_URL
+  SERVICENOW_USERNAME + SERVICENOW_PASSWORD
+  Or: SERVICENOW_AUTH_TYPE=bearer and SERVICENOW_ACCESS_TOKEN
+  Optional: SERVICENOW_PAGE_SIZE, SERVICENOW_CUSTOM_FIELD_MODE
 
 MySQL:
   MYSQL_URL or HOST/USER/PASSWORD

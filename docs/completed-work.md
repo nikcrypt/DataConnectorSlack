@@ -48,8 +48,9 @@ Incremental mode is working for the objects that have a modified or created time
 - SQL Server tables, columns, and constraints by object create or modify time, and table rows when the table has a modified-time column
 - Oracle tables, views, and columns by object create or last DDL time
 - MySQL tables and columns by table create or update time
+- PostgreSQL tables, views, and columns by catalog commit time, or by table file modification time when commit timestamps are off
 
-Run a full `extract:<name>:mongo` once, then `npm run extract:<name>:mongo:incremental`. Catalog objects stay a full read: PostgreSQL schemas and columns, MySQL schemas and views, Oracle and SQL Server schemas, Slack users and channels, Jira projects and statuses, Salesforce object definitions, and SharePoint lists and columns.
+Run a full `extract:<name>:mongo` once, then `npm run extract:<name>:mongo:incremental`. Catalog objects stay a full read: PostgreSQL schemas, MySQL schemas and views, Oracle and SQL Server schemas, Slack users and channels, Jira projects and statuses, Salesforce object definitions, and SharePoint lists and columns.
 
 ## Slack incremental extract
 
