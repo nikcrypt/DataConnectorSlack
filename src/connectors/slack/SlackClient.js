@@ -9,6 +9,8 @@ const METHOD_SCOPES = {
   "usergroups.list": "usergroups:read",
   "files.list": "files:read",
   "team.info": "team:read",
+  "chat.postMessage": "chat:write",
+  "conversations.join": "channels:join",
 };
 
 /**
