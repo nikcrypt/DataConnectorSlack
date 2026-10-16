@@ -12,6 +12,7 @@ import { MysqlConnector } from "./connectors/mysql/MysqlConnector.js";
 import { MSSQLConnector } from "./connectors/mssql/MSSQLConnector.js";
 import { WindowsConnector } from "./connectors/windows/WindowsConnector.js";
 import { ServiceNowConnector } from "./connectors/servicenow/ServiceNowConnector.js";
+import { OneDriveConnector } from "./connectors/onedrive/OneDriveConnector.js";
 import { ConnectorRuntimeEngine } from "./runtime/ConnectorRuntimeEngine.js";
 import { MongoRuntime } from "./runtime/MongoRuntime.js";
 import { loadSlackAuth, getBotTokenFromEnvOrAuth } from "./connectors/slack/tokenStore.js";
@@ -75,6 +76,8 @@ function createConnector(name) {
       return Promise.resolve(PostgresConnector.fromEnv());
     case "sharepoint":
       return Promise.resolve(SharePointConnector.fromEnv());
+    case "onedrive":
+      return Promise.resolve(OneDriveConnector.fromEnv());
     case "salesforce":
       return Promise.resolve(SalesforceConnector.fromEnv());
     case "jira":
@@ -102,7 +105,7 @@ function createConnector(name) {
       return Promise.resolve(ServiceNowConnector.fromEnv());
     default:
       throw new Error(
-        `Unknown connector: ${name}. Use slack, postgres, mysql, mssql, sharepoint, salesforce, jira, googledrive, box, confluence, oracle, windows, or servicenow.`
+        `Unknown connector: ${name}. Use slack, postgres, mysql, mssql, sharepoint, onedrive, salesforce, jira, googledrive, box, confluence, oracle, windows, or servicenow.`
       );
   }
 }
@@ -219,16 +222,17 @@ Data connector CLI
     npm run logout
     Optional: APP_AUTH_SESSION_HOURS=12 (default 12)
 
-  npm run test:connection -- --connector slack|postgres|mysql|mssql|oracle|sharepoint|salesforce|jira|googledrive|box|confluence|windows|servicenow
+  npm run test:connection -- --connector slack|postgres|mysql|mssql|oracle|sharepoint|onedrive|salesforce|jira|googledrive|box|confluence|windows|servicenow
   npm run extract -- --connector mysql
   npm run extract -- --connector mysql --objects schemas,tables,columns
-  npm run extract:slack | extract:postgres | extract:mysql | extract:mssql | extract:oracle | extract:sharepoint | extract:salesforce | extract:jira | extract:googledrive | extract:box | extract:confluence | extract:windows | extract:servicenow
-  npm run extract:slack:mongo | extract:postgres:mongo | extract:mysql:mongo | extract:mssql:mongo | extract:oracle:mongo | extract:sharepoint:mongo | extract:salesforce:mongo | extract:jira:mongo | extract:googledrive:mongo | extract:box:mongo | extract:confluence:mongo | extract:windows:mongo | extract:servicenow:mongo
+  npm run extract:slack | extract:postgres | extract:mysql | extract:mssql | extract:oracle | extract:sharepoint | extract:onedrive | extract:salesforce | extract:jira | extract:googledrive | extract:box | extract:confluence | extract:windows | extract:servicenow
+  npm run extract:slack:mongo | extract:postgres:mongo | extract:mysql:mongo | extract:mssql:mongo | extract:oracle:mongo | extract:sharepoint:mongo | extract:onedrive:mongo | extract:salesforce:mongo | extract:jira:mongo | extract:googledrive:mongo | extract:box:mongo | extract:confluence:mongo | extract:windows:mongo | extract:servicenow:mongo
   npm run extract:slack:mongo:incremental
   npm run extract:mssql:mongo:incremental
   npm run extract:oracle:mongo:incremental
   npm run extract:mysql:mongo:incremental
   npm run extract:postgres:mongo:incremental
+  npm run extract:onedrive:mongo:incremental
   npm run extract:servicenow:mongo:incremental
 
 Slack:
@@ -261,6 +265,12 @@ Oracle:
 
 SharePoint:
   SHAREPOINT_TENANT_ID, CLIENT_ID, CLIENT_SECRET, HOSTNAME, SITE_PATH
+
+OneDrive:
+  ONEDRIVE_TENANT_ID, ONEDRIVE_CLIENT_ID, ONEDRIVE_CLIENT_SECRET
+  ONEDRIVE_USER_ID=user@company.com
+  Objects: drives, driveItems
+  Extraction settings: src/config/connectors/onedrive.json
 
 Salesforce:
   SF_ACCESS_TOKEN + SF_INSTANCE_URL  (or client id/secret + password)
