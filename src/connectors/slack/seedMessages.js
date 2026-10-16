@@ -26,17 +26,21 @@ function channelHint() {
 
 async function resolveChannel(client, channel) {
   if (/^[CG][A-Z0-9]+$/.test(channel)) return channel;
-  const name = channel.replace(/^#/, "");
+  const name = channel.replace(/^#/, "").toLowerCase();
+  const visible = [];
   for await (const item of client.paginate("conversations.list", "channels", {
     types: "public_channel,private_channel",
     exclude_archived: true,
     limit: 200,
   })) {
+    visible.push(item.name);
     if (item.name === name) return item.id;
   }
-  throw new Error(
-    `Slack channel not found: ${channel}. Pass a channel id with --channel C0123456789, or invite the bot and set SLACK_SEED_CHANNEL.`
-  );
+  const close = visible.filter((item) => item.includes(name) || name.includes(item));
+  const hint = close.length
+    ? ` Closest match: ${close.map((item) => `#${item}`).join(", ")}.`
+    : ` Channels this bot can see: ${visible.map((item) => `#${item}`).join(", ") || "none"}.`;
+  throw new Error(`Slack channel not found: ${channel}.${hint} Invite the bot into the channel, then rerun.`);
 }
 
 async function main() {

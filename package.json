@@ -8,6 +8,8 @@
     "auth": "node src/auth-server.js",
     "auth:status": "node src/cli.js auth-status",
     "auth:googledrive": "node src/connectors/googledrive/loginCli.js",
+    "login": "node src/cli.js login",
+    "logout": "node src/cli.js logout",
     "test:connection": "node src/cli.js test",
     "test:slack": "node src/cli.js test --connector slack",
     "test:postgres": "node src/cli.js test --connector postgres",

@@ -15,6 +15,7 @@ import { ServiceNowConnector } from "./connectors/servicenow/ServiceNowConnector
 import { ConnectorRuntimeEngine } from "./runtime/ConnectorRuntimeEngine.js";
 import { MongoRuntime } from "./runtime/MongoRuntime.js";
 import { loadSlackAuth, getBotTokenFromEnvOrAuth } from "./connectors/slack/tokenStore.js";
+import { loginCli, logoutCli, requireCliAuth } from "./cliAuth.js";
 
 function parseArgs(argv) {
   const args = {
@@ -114,6 +115,18 @@ async function main() {
     return;
   }
 
+  if (args.command === "login") {
+    const session = await loginCli(process.argv);
+    console.log(`[cli] logged in as ${session.user} (expires ${session.expiresAt}, ${session.hours}h)`);
+    return;
+  }
+
+  if (args.command === "logout") {
+    const cleared = await logoutCli();
+    console.log(cleared ? "[cli] logged out" : "[cli] no active session");
+    return;
+  }
+
   if (args.command === "auth-status") {
     if (args.connector !== "slack") {
       console.log("auth-status is only for Slack.");
@@ -142,6 +155,9 @@ async function main() {
     );
     return;
   }
+
+  const session = await requireCliAuth();
+  console.log(`[cli] session ok (${session.user})`);
 
   const connector = await createConnector(args.connector);
 
@@ -194,6 +210,14 @@ async function main() {
 function printHelp() {
   console.log(`
 Data connector CLI
+
+  CLI auth (login once, then run connectors):
+    Set APP_AUTH_USER and APP_AUTH_PASSWORD in .env
+    npm run login -- --user qa --password secret
+    npm run test:jira
+    npm run extract:jira:mongo
+    npm run logout
+    Optional: APP_AUTH_SESSION_HOURS=12 (default 12)
 
   npm run test:connection -- --connector slack|postgres|mysql|mssql|oracle|sharepoint|salesforce|jira|googledrive|box|confluence|windows|servicenow
   npm run extract -- --connector mysql

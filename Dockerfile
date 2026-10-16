@@ -1,5 +1,7 @@
 FROM node:20-bookworm-slim
 
+ENV npm_config_update_notifier=false
+
 WORKDIR /app
 
 COPY package.json package-lock.json ./
