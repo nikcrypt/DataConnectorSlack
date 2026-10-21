@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Connector settings</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="hero">
+        <div>
+          <h1>Connector settings</h1>
+          <p>
+            RBAC for connector JSON, audit trail, and Run extract into the Phase 2 API
+            (Postgres + Kafka). Passwords are stored hashed on disk.
+          </p>
+        </div>
+        <div id="sessionBar" class="actions hidden">
+          <span id="sessionMeta" class="meta"></span>
+          <button id="logoutBtn" class="btn secondary" type="button">Log out</button>
+        </div>
+      </header>
+
+      <section id="loginPanel" class="panel">
+        <form id="loginForm" class="login-grid">
+          <label>
+            Username
+            <input id="username" name="username" autocomplete="username" required />
+          </label>
+          <label>
+            Password
+            <input id="password" name="password" type="password" autocomplete="current-password" required />
+          </label>
+          <div class="actions">
+            <button class="btn" type="submit">Log in</button>
+            <span class="meta">Try <code>viewer</code> / <code>viewer123</code> or <code>editor</code> / <code>editor123</code></span>
+          </div>
+          <div id="loginStatus" class="status"></div>
+        </form>
+      </section>
+
+      <section id="appPanel" class="hidden">
+        <div class="layout">
+          <aside class="panel list" id="connectorList"></aside>
+          <section class="panel">
+            <div class="editor-head">
+              <h2 id="editorTitle">Select a connector</h2>
+              <span id="roleBadge" class="badge"></span>
+            </div>
+            <textarea id="configEditor" spellcheck="false" disabled placeholder="Select a connector to view its JSON config."></textarea>
+            <div class="actions" style="margin-top: 12px">
+              <button id="saveBtn" class="btn" type="button" disabled>Save</button>
+              <button id="reloadBtn" class="btn secondary" type="button" disabled>Reload</button>
+            </div>
+            <div id="editorStatus" class="status"></div>
+
+            <div id="runPanel" class="run-panel hidden">
+              <h3>Run extract</h3>
+              <p class="meta">Queues a job on the Phase 2 API (<span id="phase2Label">…</span>). Editors only.</p>
+              <div class="run-grid">
+                <label>
+                  Mode
+                  <select id="extractMode">
+                    <option value="full">full</option>
+                    <option value="incremental">incremental</option>
+                  </select>
+                </label>
+                <label>
+                  Objects (comma-separated, optional)
+                  <input id="extractObjects" placeholder="messages,users" />
+                </label>
+              </div>
+              <div class="actions" style="margin-top: 12px">
+                <button id="runBtn" class="btn" type="button">Run extract</button>
+                <button id="refreshJobBtn" class="btn secondary" type="button" disabled>Refresh job</button>
+              </div>
+              <pre id="jobBox" class="job-box hidden"></pre>
+              <div id="runStatus" class="status"></div>
+            </div>
+          </section>
+        </div>
+
+        <section class="panel audit-panel">
+          <div class="editor-head">
+            <h2>Audit log</h2>
+            <button id="refreshAuditBtn" class="btn secondary" type="button">Refresh</button>
+          </div>
+          <div id="auditList" class="audit-list meta">Loading…</div>
+        </section>
+      </section>
+    </main>
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>

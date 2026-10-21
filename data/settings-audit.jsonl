@@ -1,0 +1,6 @@
+{"at":"2026-10-21T09:51:27.540Z","action":"login","username":"editor","role":"editor"}
+{"at":"2026-10-21T09:51:27.609Z","action":"config_save","username":"editor","role":"editor","connector":"jira","beforeKeys":["connector","objects","options"],"afterKeys":["connector","objects","options"]}
+{"at":"2026-10-21T09:51:27.650Z","action":"extract_run_failed","username":"editor","role":"editor","connector":"slack","error":"Phase 2 API unreachable at http://localhost:8080/extractions. Start it with: cd phase2 && docker compose up --build"}
+{"at":"2026-10-21T09:51:27.690Z","action":"login","username":"viewer","role":"viewer"}
+{"at":"2026-10-21T09:55:23.122Z","action":"login","username":"viewer","role":"viewer"}
+{"at":"2026-10-21T09:55:50.682Z","action":"login","username":"editor","role":"editor"}

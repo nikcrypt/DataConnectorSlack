@@ -1,0 +1,20 @@
+{
+  "name": "data-connector-phase2",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Phase 2 Kafka + Postgres + MinIO platform skeleton",
+  "scripts": {
+    "api": "node src/api/server.js",
+    "status-writer": "node src/status-writer/index.js",
+    "worker": "node src/worker/index.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.758.0",
+    "kafkajs": "^2.2.4",
+    "pg": "^8.13.1"
+  }
+}

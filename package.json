@@ -10,6 +10,7 @@
     "auth:googledrive": "node src/connectors/googledrive/loginCli.js",
     "login": "node src/cli.js login",
     "logout": "node src/cli.js logout",
+    "settings": "node src/settings/server.js",
     "test:connection": "node src/cli.js test",
     "test:slack": "node src/cli.js test --connector slack",
     "test:postgres": "node src/cli.js test --connector postgres",

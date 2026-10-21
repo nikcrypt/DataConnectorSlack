@@ -1,0 +1,14 @@
+[
+  {
+    "username": "viewer",
+    "role": "viewer",
+    "passwordSalt": "7f2d324a86fe3ff0108c04cb52ed4d21",
+    "passwordHash": "bdbea3a33bdccfbf534a4388d52d0d31fc9d2a28d7ea3619e1779d0e38f68631a75f632f86f70f5fe0d84ad34113c4440f4b3d6ee71bbb51828d4eec435cf31a"
+  },
+  {
+    "username": "editor",
+    "role": "editor",
+    "passwordSalt": "b7225b80b753e2909442103f94073672",
+    "passwordHash": "aaad97b7e027fed6dabf156016033ecefbb7ecdf5c55e248397beaedc1f9181209b2d2cdeea0f20aaa8b3cfdb6ac5193e8c2fcc6a6256f3eec6e7078407addaa"
+  }
+]
