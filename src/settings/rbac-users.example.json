@@ -5,8 +5,8 @@
     "role": "viewer"
   },
   {
-    "username": "editor",
-    "password": "editor123",
-    "role": "editor"
+    "username": "admin",
+    "password": "admin123",
+    "role": "admin"
   }
 ]

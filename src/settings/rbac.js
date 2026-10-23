@@ -5,7 +5,7 @@ import path from "node:path";
 const USERS_PATH = path.resolve("data/rbac-users.json");
 const EXAMPLE_PATH = new URL("./rbac-users.example.json", import.meta.url);
 
-const ROLES = new Set(["viewer", "editor"]);
+const ROLES = new Set(["viewer", "admin"]);
 
 export async function ensureUsersFile() {
   try {
@@ -14,7 +14,7 @@ export async function ensureUsersFile() {
     await mkdir(path.dirname(USERS_PATH), { recursive: true });
     await copyFile(EXAMPLE_PATH, USERS_PATH);
   }
-  await migratePlaintextPasswords();
+  await migrateUsersFile();
   return USERS_PATH;
 }
 
@@ -38,11 +38,12 @@ export async function authenticate(username, password) {
 }
 
 export function canView(role) {
-  return role === "viewer" || role === "editor";
+  return role === "viewer" || role === "admin";
 }
 
+/** Admin can edit config and run extracts. */
 export function canEdit(role) {
-  return role === "editor";
+  return role === "admin";
 }
 
 export function hashPassword(password, salt = randomBytes(16).toString("hex")) {
@@ -62,7 +63,7 @@ function verifyPassword(password, salt, passwordHash) {
   }
 }
 
-async function migratePlaintextPasswords() {
+async function migrateUsersFile() {
   const raw = await readFile(USERS_PATH, "utf8");
   const users = JSON.parse(raw);
   if (!Array.isArray(users)) return;
@@ -70,28 +71,53 @@ async function migratePlaintextPasswords() {
   let changed = false;
   const migrated = users.map((entry) => {
     if (!entry || typeof entry !== "object") return entry;
-    if (entry.passwordHash && entry.passwordSalt && !entry.password) return entry;
-    if (entry.password == null || entry.password === "") return entry;
-    const hashed = hashPassword(entry.password);
-    changed = true;
-    return {
-      username: entry.username,
-      role: entry.role,
-      passwordSalt: hashed.passwordSalt,
-      passwordHash: hashed.passwordHash,
-    };
+    let next = { ...entry };
+
+    // Rename legacy editor role / username → admin
+    if (String(next.role || "").toLowerCase() === "editor") {
+      next.role = "admin";
+      changed = true;
+    }
+    if (String(next.username || "").trim().toLowerCase() === "editor") {
+      next.username = "admin";
+      changed = true;
+    }
+
+    if (next.passwordHash && next.passwordSalt && (next.password == null || next.password === "")) {
+      return {
+        username: next.username,
+        role: next.role,
+        passwordSalt: next.passwordSalt,
+        passwordHash: next.passwordHash,
+      };
+    }
+
+    if (next.password != null && next.password !== "") {
+      const hashed = hashPassword(next.password);
+      changed = true;
+      return {
+        username: next.username,
+        role: next.role,
+        passwordSalt: hashed.passwordSalt,
+        passwordHash: hashed.passwordHash,
+      };
+    }
+
+    return next;
   });
 
   if (changed) {
     await writeFile(USERS_PATH, `${JSON.stringify(migrated, null, 2)}\n`, "utf8");
-    console.log("[settings] migrated plaintext passwords to scrypt hashes in data/rbac-users.json");
+    console.log("[settings] migrated rbac users (editor→admin / password hashes) in data/rbac-users.json");
   }
 }
 
 function normalizeUser(entry) {
   if (!entry || typeof entry !== "object") return null;
-  const username = String(entry.username || "").trim();
-  const role = String(entry.role || "").trim().toLowerCase();
+  let username = String(entry.username || "").trim();
+  let role = String(entry.role || "").trim().toLowerCase();
+  if (role === "editor") role = "admin";
+  if (username.toLowerCase() === "editor") username = "admin";
   if (!username || !ROLES.has(role)) return null;
 
   if (entry.passwordHash && entry.passwordSalt) {
@@ -103,7 +129,6 @@ function normalizeUser(entry) {
     };
   }
 
-  // Allow one-read of plaintext during migration path
   if (entry.password != null && entry.password !== "") {
     const hashed = hashPassword(entry.password);
     return {

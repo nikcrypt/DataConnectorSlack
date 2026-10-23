@@ -9,8 +9,8 @@ import {
   readConnectorConfig,
   writeConnectorConfig,
 } from "./configStore.js";
-import { createExtraction, getExtraction, phase2BaseUrl } from "./extractClient.js";
 import { authenticate, canEdit, canView, ensureUsersFile } from "./rbac.js";
+import { getExtractJob, startExtractJob } from "./runExtract.js";
 import { createSession, destroySession, getSession } from "./sessions.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -90,7 +90,7 @@ async function requireAuth(req, res, { edit = false } = {}) {
     return null;
   }
   if (edit && !canEdit(session.role)) {
-    sendJson(res, 403, { error: "Editor role required" });
+    sendJson(res, 403, { error: "Admin role required" });
     return null;
   }
   return session;
@@ -98,11 +98,7 @@ async function requireAuth(req, res, { edit = false } = {}) {
 
 async function handleApi(req, res, url) {
   if (req.method === "GET" && url.pathname === "/api/health") {
-    return sendJson(res, 200, {
-      ok: true,
-      service: "settings",
-      phase2Api: phase2BaseUrl(),
-    });
+    return sendJson(res, 200, { ok: true, service: "settings" });
   }
 
   if (req.method === "POST" && url.pathname === "/api/login") {
@@ -165,7 +161,6 @@ async function handleApi(req, res, url) {
       role: session.role,
       canEdit: canEdit(session.role),
       connectors: keys,
-      phase2Api: phase2BaseUrl(),
     });
   }
 
@@ -184,15 +179,15 @@ async function handleApi(req, res, url) {
           .map((item) => item.trim())
           .filter(Boolean);
     const mode = body.mode === "incremental" ? "incremental" : "full";
+    const target = body.target === "jsonl" ? "jsonl" : "mongo";
     try {
-      // Ensure config exists before queuing
       await readConnectorConfig(key);
-      const created = await createExtraction({
+      const created = startExtractJob({
         connectorKey: key,
         objects,
         mode,
+        target,
         requestedBy: session.username,
-        params: body.params && typeof body.params === "object" ? body.params : {},
       });
       await appendAudit({
         action: "extract_run",
@@ -200,6 +195,7 @@ async function handleApi(req, res, url) {
         role: session.role,
         connector: key,
         mode,
+        target,
         objects,
         requestId: created.request_id,
       });
@@ -220,12 +216,9 @@ async function handleApi(req, res, url) {
   if (jobMatch && req.method === "GET") {
     const session = await requireAuth(req, res);
     if (!session) return;
-    try {
-      const job = await getExtraction(jobMatch[1]);
-      return sendJson(res, 200, job);
-    } catch (error) {
-      return sendJson(res, error.status || 500, { error: error.message });
-    }
+    const job = getExtractJob(jobMatch[1]);
+    if (!job) return sendJson(res, 404, { error: "Job not found (jobs reset when the settings server restarts)" });
+    return sendJson(res, 200, job);
   }
 
   const one = url.pathname.match(/^\/api\/connectors\/([a-z0-9_-]+)$/i);
@@ -299,10 +292,10 @@ async function main() {
   });
   server.listen(port, () => {
     console.log(`[settings] open http://localhost:${port}`);
-    console.log(`[settings] Phase 2 API: ${phase2BaseUrl()}`);
+    console.log("[settings] admins can run full/incremental Mongo extracts from the UI");
     console.log("[settings] demo users (passwords hashed on disk):");
     console.log("  viewer / viewer123  → view only");
-    console.log("  editor / editor123  → view + edit + run extract");
+    console.log("  admin / admin123    → view + edit + run extract");
   });
 }
 

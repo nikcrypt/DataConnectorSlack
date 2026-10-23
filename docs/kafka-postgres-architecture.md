@@ -1,11 +1,11 @@
 # Phase 2 Design: Scalable Connector Platform
 
-**Status:** Skeleton implemented under [`phase2/`](../phase2/)  
+**Status:** Design only (not shipped in this repo)  
 **Audience:** Engineering + stakeholders  
 **Related POC:** `data-connector-app-poc` (Slack, Postgres, SharePoint, Salesforce, Jira, Google Drive, Box)  
 **Supersedes (for Phase 2 messaging):** RabbitMQ path in `docs/phase1-vs-rabbitmq-comparison.md`
 
-**Runnable slice:** `phase2/docker-compose.yml` (Postgres, Kafka, MinIO, API, status-writer, sample `connector-slack` worker), SQL in `phase2/migrations/`, message schemas in `phase2/schemas/`.
+The current POC runs extracts from the CLI and from the settings UI (`npm run settings`) using the local Mongo runtime. A Kafka + Postgres worker platform is a future option described below, not required for demos.
 
 ---
 
@@ -300,21 +300,21 @@ Postgres does **not** store full extract payloads at scale.
 
 ---
 
-## 13. Docker Compose layout (implemented skeleton)
+## 13. Docker Compose layout (future)
 
 ```text
-phase2/docker-compose.yml
+docker-compose.yml (platform)
   postgres
-  kafka          (KRaft, no ZooKeeper)
-  kafka-init     (creates extract.commands / extract.events / extract.dlq)
+  kafka
   minio
-  minio-init
   api
   status-writer
-  connector-slack   (sample worker; CONNECTOR_KEY=slack, stub or live)
+  connector-slack
+  connector-jira
+  …
 ```
 
-Each connector container: same Phase 2 worker image, different `CONNECTOR_KEY`, env for Kafka brokers, Postgres DSN, and MinIO. Add more services by copying `connector-slack` with another key (`jira`, `box`, …). Root [`docker-compose.yml`](../docker-compose.yml) remains the Phase 1 QA image and is unchanged.
+Each connector container: same worker image, different `CONNECTOR_KEY`, env for Kafka brokers, Postgres DSN, and MinIO. Root [`docker-compose.yml`](../docker-compose.yml) today is the Phase 1 QA image only.
 
 ---
 
@@ -343,12 +343,12 @@ Each connector container: same Phase 2 worker image, different `CONNECTOR_KEY`, 
 
 | Step | Deliverable | Status |
 |---|---|---|
-| 1 | This design accepted | Done |
-| 2 | Compose: Postgres + Kafka + MinIO + stub API | Done (`phase2/`) |
-| 3 | Schema migrations + message JSON schemas | Done |
-| 4 | Kafka consumer loop wrapping **one** connector (Slack sample; stub mode by default) | Done |
-| 5 | Status-writer + API status read path | Done |
-| 6 | Remaining connectors as additional services (same pattern) | Next |
+| 1 | This design accepted | Design doc |
+| 2 | Compose: Postgres + Kafka + MinIO + stub API | Not in repo |
+| 3 | Schema migrations + message JSON schemas | Not in repo |
+| 4 | Kafka consumer loop wrapping **one** connector | Not in repo |
+| 5 | Status-writer + API status read path | Not in repo |
+| 6 | Remaining connectors as additional services | Future |
 
 ---
 

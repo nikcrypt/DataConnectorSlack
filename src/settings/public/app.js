@@ -15,7 +15,6 @@ const runBtn = document.getElementById("runBtn");
 const refreshJobBtn = document.getElementById("refreshJobBtn");
 const runStatus = document.getElementById("runStatus");
 const jobBox = document.getElementById("jobBox");
-const phase2Label = document.getElementById("phase2Label");
 const auditList = document.getElementById("auditList");
 
 let state = {
@@ -24,7 +23,7 @@ let state = {
   canEdit: false,
   selected: null,
   lastRequestId: null,
-  phase2Api: "",
+  pollTimer: null,
 };
 
 async function api(path, options = {}) {
@@ -48,14 +47,22 @@ function setStatus(el, message, kind = "") {
   el.className = `status${kind ? ` ${kind}` : ""}`;
 }
 
+function stopPoll() {
+  if (state.pollTimer) {
+    clearInterval(state.pollTimer);
+    state.pollTimer = null;
+  }
+}
+
 function showLoggedOut() {
+  stopPoll();
   state = {
     username: null,
     role: null,
     canEdit: false,
     selected: null,
     lastRequestId: null,
-    phase2Api: "",
+    pollTimer: null,
   };
   loginPanel.classList.remove("hidden");
   appPanel.classList.add("hidden");
@@ -72,7 +79,7 @@ function showLoggedOut() {
 function showLoggedIn(user) {
   state.username = user.username;
   state.role = user.role;
-  state.canEdit = user.role === "editor";
+  state.canEdit = user.role === "admin";
   loginPanel.classList.add("hidden");
   appPanel.classList.remove("hidden");
   sessionBar.classList.remove("hidden");
@@ -87,8 +94,6 @@ function showLoggedIn(user) {
 async function loadConnectors() {
   const data = await api("/api/connectors");
   state.canEdit = Boolean(data.canEdit);
-  state.phase2Api = data.phase2Api || "";
-  phase2Label.textContent = state.phase2Api || "not set";
   runPanel.classList.toggle("hidden", !state.canEdit);
   connectorList.innerHTML = "";
   for (const key of data.connectors) {
@@ -119,9 +124,10 @@ async function selectConnector(key) {
   saveBtn.disabled = !state.canEdit;
   setStatus(
     editorStatus,
-    state.canEdit ? "Editor: you can save changes and run extracts." : "Viewer: read only.",
+    state.canEdit ? "Admin: you can save changes and run extracts." : "Viewer: read only.",
     state.canEdit ? "ok" : ""
   );
+  updateTargetHint();
 }
 
 async function loadAudit() {
@@ -137,7 +143,8 @@ async function loadAudit() {
       row.className = "audit-row";
       const detail = [
         item.connector ? `connector=${item.connector}` : "",
-        item.requestId ? `request=${item.requestId}` : "",
+        item.target ? `target=${item.target}` : "",
+        item.requestId ? `job=${item.requestId}` : "",
         item.mode ? `mode=${item.mode}` : "",
         item.error ? `error=${item.error}` : "",
       ]
@@ -153,15 +160,27 @@ async function loadAudit() {
 
 async function refreshJob() {
   if (!state.lastRequestId) return;
-  setStatus(runStatus, "Refreshing job…");
   try {
     const job = await api(`/api/extractions/${encodeURIComponent(state.lastRequestId)}`);
     jobBox.textContent = JSON.stringify(job, null, 2);
     jobBox.classList.remove("hidden");
-    setStatus(runStatus, `Job status: ${job.status}`, job.status === "failed" ? "error" : "ok");
+    const kind = job.status === "failed" ? "error" : job.status === "succeeded" ? "ok" : "";
+    setStatus(runStatus, `Job status: ${job.status}${job.error ? ` — ${job.error}` : ""}`, kind);
+    if (job.status === "succeeded" || job.status === "failed") {
+      stopPoll();
+      await loadAudit();
+    }
   } catch (error) {
+    stopPoll();
     setStatus(runStatus, error.message, "error");
   }
+}
+
+function startPoll() {
+  stopPoll();
+  state.pollTimer = setInterval(() => {
+    refreshJob().catch(() => {});
+  }, 2000);
 }
 
 document.getElementById("loginForm").addEventListener("submit", async (event) => {
@@ -215,22 +234,41 @@ reloadBtn.addEventListener("click", async () => {
   }
 });
 
+function updateTargetHint() {
+  const hint = document.getElementById("targetHint");
+  if (!hint) return;
+  const target = document.getElementById("extractTarget")?.value || "mongo";
+  const key = state.selected || "<connector>";
+  hint.textContent =
+    target === "jsonl"
+      ? `Local JSONL → data/output/${key}/ (same as npm run extract:${key})`
+      : `MongoDB → database from MONGO_URL, collection "${key}" (same as npm run extract:${key}:mongo)`;
+}
+
+document.getElementById("extractTarget")?.addEventListener("change", updateTargetHint);
+
 runBtn.addEventListener("click", async () => {
   if (!state.selected || !state.canEdit) return;
-  setStatus(runStatus, "Queuing extract…");
+  setStatus(runStatus, "Starting extract…");
   try {
     const objects = document.getElementById("extractObjects").value;
     const mode = document.getElementById("extractMode").value;
+    const target = document.getElementById("extractTarget").value;
     const created = await api(`/api/connectors/${encodeURIComponent(state.selected)}/extract`, {
       method: "POST",
-      body: JSON.stringify({ objects, mode }),
+      body: JSON.stringify({ objects, mode, target }),
     });
     state.lastRequestId = created.request_id;
     refreshJobBtn.disabled = false;
     jobBox.textContent = JSON.stringify(created, null, 2);
     jobBox.classList.remove("hidden");
-    setStatus(runStatus, `Queued ${created.request_id}`, "ok");
+    setStatus(
+      runStatus,
+      `Queued ${created.request_id} (${created.target || target}, ${mode})`,
+      "ok"
+    );
     await loadAudit();
+    startPoll();
     await refreshJob();
   } catch (error) {
     setStatus(runStatus, error.message, "error");

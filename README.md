@@ -192,6 +192,30 @@ npm run extract:jira:mongo
 npm run extract:postgres:mongo
 ```
 
+## 4. Seed Slack test messages (QA / demo data)
+
+Posts sample messages into a channel so you can exercise full and incremental extract without typing them by hand. Uses `SLACK_BOT_TOKEN` from `.env` (or `data/slack-auth.json`). The bot must already be a member of the channel (`/invite @YourBotName`). Bot scopes need `chat:write` (add scope → reinstall app → update token if posting fails).
+
+```bash
+# Default: 200 messages (~4 minutes with the default delay)
+npm run seed:slack -- --channel "#all-dataconnector"
+
+# Optional flags
+npm run seed:slack -- --channel "#all-dataconnector" --count 50
+npm run seed:slack -- --channel "#all-dataconnector" --count 200 --delay-ms 1100
+```
+
+- `--channel` — channel name (`#name`) or channel id (`C…`). Name must match Slack exactly.
+- `--count` — how many messages to post (default `200`).
+- `--delay-ms` — pause between posts (default `1100`) to stay under rate limits.
+
+After seeding:
+
+```bash
+npm run extract:slack:mongo
+npm run extract:slack:mongo:incremental
+```
+
 ## Project layout
 
 ```text

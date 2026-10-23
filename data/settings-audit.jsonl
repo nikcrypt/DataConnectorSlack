@@ -4,3 +4,15 @@
 {"at":"2026-10-21T09:51:27.690Z","action":"login","username":"viewer","role":"viewer"}
 {"at":"2026-10-21T09:55:23.122Z","action":"login","username":"viewer","role":"viewer"}
 {"at":"2026-10-21T09:55:50.682Z","action":"login","username":"editor","role":"editor"}
+{"at":"2026-10-23T04:58:27.358Z","action":"login","username":"editor","role":"editor"}
+{"at":"2026-10-23T04:58:27.373Z","action":"extract_run","username":"editor","role":"editor","connector":"slack","mode":"full","objects":["users"],"requestId":"0399da19-77d5-48bb-b59c-4d665517dfd8"}
+{"at":"2026-10-23T04:58:28.410Z","action":"extract_run","username":"editor","role":"editor","connector":"slack","mode":"full","objects":["users"],"requestId":"433df45f-e092-45d6-bde3-abf6c276f16e"}
+{"at":"2026-10-23T05:00:18.112Z","action":"login_failed","username":"editor"}
+{"at":"2026-10-23T05:00:19.774Z","action":"login_failed","username":"editor"}
+{"at":"2026-10-23T05:00:26.505Z","action":"login","username":"editor","role":"editor"}
+{"at":"2026-10-23T05:00:44.788Z","action":"extract_run","username":"editor","role":"editor","connector":"slack","mode":"full","objects":[],"requestId":"33b739e1-ddb7-4fec-86cf-265cbac331c4"}
+{"at":"2026-10-23T05:03:52.442Z","action":"login","username":"admin","role":"admin"}
+{"at":"2026-10-23T05:03:58.954Z","action":"login","username":"admin","role":"admin"}
+{"at":"2026-10-23T05:03:58.964Z","action":"login_failed","username":"editor"}
+{"at":"2026-10-23T05:05:19.746Z","action":"login","username":"admin","role":"admin"}
+{"at":"2026-10-23T05:09:15.697Z","action":"login","username":"admin","role":"admin"}

@@ -12,8 +12,8 @@
         <div>
           <h1>Connector settings</h1>
           <p>
-            RBAC for connector JSON, audit trail, and Run extract into the Phase 2 API
-            (Postgres + Kafka). Passwords are stored hashed on disk.
+            View and edit connector JSON. Admins can also run full or incremental
+            Mongo extracts from this screen (same path as <code>npm run extract:*:mongo</code>).
           </p>
         </div>
         <div id="sessionBar" class="actions hidden">
@@ -34,7 +34,7 @@
           </label>
           <div class="actions">
             <button class="btn" type="submit">Log in</button>
-            <span class="meta">Try <code>viewer</code> / <code>viewer123</code> or <code>editor</code> / <code>editor123</code></span>
+            <span class="meta">Try <code>viewer</code> / <code>viewer123</code> or <code>admin</code> / <code>admin123</code></span>
           </div>
           <div id="loginStatus" class="status"></div>
         </form>
@@ -57,8 +57,18 @@
 
             <div id="runPanel" class="run-panel hidden">
               <h3>Run extract</h3>
-              <p class="meta">Queues a job on the Phase 2 API (<span id="phase2Label">…</span>). Editors only.</p>
-              <div class="run-grid">
+              <p class="meta">
+                Admins only. Uses connector credentials from <code>.env</code>.
+                Choose where output is written: MongoDB or local JSONL files.
+              </p>
+              <div class="run-grid run-grid-3">
+                <label>
+                  Destination
+                  <select id="extractTarget">
+                    <option value="mongo">MongoDB (MONGO_URL)</option>
+                    <option value="jsonl">Local JSONL (data/output)</option>
+                  </select>
+                </label>
                 <label>
                   Mode
                   <select id="extractMode">
@@ -71,6 +81,7 @@
                   <input id="extractObjects" placeholder="messages,users" />
                 </label>
               </div>
+              <p id="targetHint" class="meta" style="margin-top: 8px"></p>
               <div class="actions" style="margin-top: 12px">
                 <button id="runBtn" class="btn" type="button">Run extract</button>
                 <button id="refreshJobBtn" class="btn secondary" type="button" disabled>Refresh job</button>

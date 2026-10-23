@@ -147,7 +147,7 @@ textarea {
   font-size: 0.85rem;
 }
 
-.badge.editor {
+.badge.admin {
   border-color: rgba(15, 92, 76, 0.35);
   color: var(--accent);
 }
@@ -227,6 +227,10 @@ textarea {
   margin-top: 12px;
 }
 
+.run-grid-3 {
+  grid-template-columns: 1fr 140px 1fr;
+}
+
 select {
   width: 100%;
   border: 1px solid var(--line);
@@ -284,6 +288,7 @@ select {
   }
 
   .run-grid,
+  .run-grid-3,
   .audit-row {
     grid-template-columns: 1fr;
   }
