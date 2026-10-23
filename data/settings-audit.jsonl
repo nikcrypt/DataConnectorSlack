@@ -16,3 +16,5 @@
 {"at":"2026-10-23T05:03:58.964Z","action":"login_failed","username":"editor"}
 {"at":"2026-10-23T05:05:19.746Z","action":"login","username":"admin","role":"admin"}
 {"at":"2026-10-23T05:09:15.697Z","action":"login","username":"admin","role":"admin"}
+{"at":"2026-10-23T05:18:17.407Z","action":"logout","username":"admin","role":"admin"}
+{"at":"2026-10-23T05:18:25.396Z","action":"login","username":"viewer","role":"viewer"}
