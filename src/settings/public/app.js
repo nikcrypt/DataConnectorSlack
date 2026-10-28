@@ -21,6 +21,7 @@ let state = {
   username: null,
   role: null,
   canEdit: false,
+  canRunExtract: false,
   selected: null,
   lastRequestId: null,
   pollTimer: null,
@@ -60,6 +61,7 @@ function showLoggedOut() {
     username: null,
     role: null,
     canEdit: false,
+    canRunExtract: false,
     selected: null,
     lastRequestId: null,
     pollTimer: null,
@@ -80,6 +82,7 @@ function showLoggedIn(user) {
   state.username = user.username;
   state.role = user.role;
   state.canEdit = user.role === "admin";
+  state.canRunExtract = user.role === "viewer" || user.role === "admin";
   loginPanel.classList.add("hidden");
   appPanel.classList.remove("hidden");
   sessionBar.classList.remove("hidden");
@@ -88,13 +91,14 @@ function showLoggedIn(user) {
   roleBadge.className = `badge ${user.role}`;
   saveBtn.disabled = !state.canEdit || !state.selected;
   configEditor.readOnly = !state.canEdit;
-  runPanel.classList.toggle("hidden", !state.canEdit);
+  runPanel.classList.toggle("hidden", !state.canRunExtract);
 }
 
 async function loadConnectors() {
   const data = await api("/api/connectors");
   state.canEdit = Boolean(data.canEdit);
-  runPanel.classList.toggle("hidden", !state.canEdit);
+  state.canRunExtract = Boolean(data.canRunExtract);
+  runPanel.classList.toggle("hidden", !state.canRunExtract);
   connectorList.innerHTML = "";
   for (const key of data.connectors) {
     const button = document.createElement("button");
@@ -124,8 +128,10 @@ async function selectConnector(key) {
   saveBtn.disabled = !state.canEdit;
   setStatus(
     editorStatus,
-    state.canEdit ? "Admin: you can save changes and run extracts." : "Viewer: read only.",
-    state.canEdit ? "ok" : ""
+    state.canEdit
+      ? "Admin: you can edit settings and run extracts."
+      : "Viewer: settings are read-only; you can still run extracts.",
+    "ok"
   );
   updateTargetHint();
 }
@@ -248,7 +254,7 @@ function updateTargetHint() {
 document.getElementById("extractTarget")?.addEventListener("change", updateTargetHint);
 
 runBtn.addEventListener("click", async () => {
-  if (!state.selected || !state.canEdit) return;
+  if (!state.selected || !state.canRunExtract) return;
   setStatus(runStatus, "Starting extract…");
   try {
     const objects = document.getElementById("extractObjects").value;

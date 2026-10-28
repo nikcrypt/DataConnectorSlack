@@ -12,8 +12,9 @@
         <div>
           <h1>Connector settings</h1>
           <p>
-            View and edit connector JSON. Admins can also run full or incremental
-            Mongo extracts from this screen (same path as <code>npm run extract:*:mongo</code>).
+            View connector JSON and run full or incremental extracts.
+            Admins can also edit settings. Same extract paths as
+            <code>npm run extract:*</code> / <code>extract:*:mongo</code>.
           </p>
         </div>
         <div id="sessionBar" class="actions hidden">
@@ -58,7 +59,7 @@
             <div id="runPanel" class="run-panel hidden">
               <h3>Run extract</h3>
               <p class="meta">
-                Admins only. Uses connector credentials from <code>.env</code>.
+                Available to viewers and admins. Uses connector credentials from <code>.env</code>.
                 Choose where output is written: MongoDB or local JSONL files.
               </p>
               <div class="run-grid run-grid-3">

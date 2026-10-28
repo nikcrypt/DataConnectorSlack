@@ -9,7 +9,7 @@ import {
   readConnectorConfig,
   writeConnectorConfig,
 } from "./configStore.js";
-import { authenticate, canEdit, canView, ensureUsersFile } from "./rbac.js";
+import { authenticate, canEdit, canRunExtract, canView, ensureUsersFile } from "./rbac.js";
 import { getExtractJob, startExtractJob } from "./runExtract.js";
 import { createSession, destroySession, getSession } from "./sessions.js";
 
@@ -83,14 +83,18 @@ async function serveStatic(urlPath, res) {
   }
 }
 
-async function requireAuth(req, res, { edit = false } = {}) {
+async function requireAuth(req, res, { edit = false, run = false } = {}) {
   const session = sessionFromRequest(req);
   if (!session || !canView(session.role)) {
     sendJson(res, 401, { error: "Login required" });
     return null;
   }
   if (edit && !canEdit(session.role)) {
-    sendJson(res, 403, { error: "Admin role required" });
+    sendJson(res, 403, { error: "Admin role required to edit settings" });
+    return null;
+  }
+  if (run && !canRunExtract(session.role)) {
+    sendJson(res, 403, { error: "Not allowed to run extracts" });
     return null;
   }
   return session;
@@ -160,6 +164,7 @@ async function handleApi(req, res, url) {
     return sendJson(res, 200, {
       role: session.role,
       canEdit: canEdit(session.role),
+      canRunExtract: canRunExtract(session.role),
       connectors: keys,
     });
   }
@@ -168,7 +173,7 @@ async function handleApi(req, res, url) {
     /^\/api\/connectors\/([a-z0-9_-]+)\/extract$/i
   );
   if (extractMatch && req.method === "POST") {
-    const session = await requireAuth(req, res, { edit: true });
+    const session = await requireAuth(req, res, { run: true });
     if (!session) return;
     const key = extractMatch[1].toLowerCase();
     const body = await readJson(req);
@@ -230,6 +235,7 @@ async function handleApi(req, res, url) {
       return sendJson(res, 200, {
         key: one[1].toLowerCase(),
         canEdit: canEdit(session.role),
+        canRunExtract: canRunExtract(session.role),
         config,
       });
     } catch (error) {
@@ -292,10 +298,9 @@ async function main() {
   });
   server.listen(port, () => {
     console.log(`[settings] open http://localhost:${port}`);
-    console.log("[settings] admins can run full/incremental Mongo extracts from the UI");
     console.log("[settings] demo users (passwords hashed on disk):");
-    console.log("  viewer / viewer123  → view only");
-    console.log("  admin / admin123    → view + edit + run extract");
+    console.log("  viewer / viewer123  → view config + run extract");
+    console.log("  admin / admin123    → edit settings + run extract");
   });
 }
 

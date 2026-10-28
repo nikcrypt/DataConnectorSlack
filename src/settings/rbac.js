@@ -41,9 +41,14 @@ export function canView(role) {
   return role === "viewer" || role === "admin";
 }
 
-/** Admin can edit config and run extracts. */
+/** Admin can edit connector settings (JSON config). */
 export function canEdit(role) {
   return role === "admin";
+}
+
+/** Viewer and admin can run full/incremental extracts. */
+export function canRunExtract(role) {
+  return role === "viewer" || role === "admin";
 }
 
 export function hashPassword(password, salt = randomBytes(16).toString("hex")) {
