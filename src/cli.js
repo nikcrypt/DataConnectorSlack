@@ -12,7 +12,6 @@ import { MysqlConnector } from "./connectors/mysql/MysqlConnector.js";
 import { MSSQLConnector } from "./connectors/mssql/MSSQLConnector.js";
 import { WindowsConnector } from "./connectors/windows/WindowsConnector.js";
 import { ServiceNowConnector } from "./connectors/servicenow/ServiceNowConnector.js";
-import { OneDriveConnector } from "./connectors/onedrive/OneDriveConnector.js";
 import { ConnectorRuntimeEngine } from "./runtime/ConnectorRuntimeEngine.js";
 import { MongoRuntime } from "./runtime/MongoRuntime.js";
 import { loadSlackAuth, getBotTokenFromEnvOrAuth } from "./connectors/slack/tokenStore.js";
@@ -77,7 +76,10 @@ function createConnector(name) {
     case "sharepoint":
       return Promise.resolve(SharePointConnector.fromEnv());
     case "onedrive":
-      return Promise.resolve(OneDriveConnector.fromEnv());
+      // Lazy-load so a missing OneDrive Graph dependency does not break other connectors
+      return import("./connectors/onedrive/OneDriveConnector.js").then(({ OneDriveConnector }) =>
+        OneDriveConnector.fromEnv()
+      );
     case "salesforce":
       return Promise.resolve(SalesforceConnector.fromEnv());
     case "jira":

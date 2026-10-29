@@ -130,14 +130,18 @@ export class GoogleDriveClient {
   }
 
   async authenticate() {
+    // Prefer service account — no browser redirect
+    if (this.serviceAccountFile) {
+      if (this.accessToken && Date.now() < this.tokenExpiresAt - 60_000) {
+        return this.accessToken;
+      }
+      return this.authenticateServiceAccount();
+    }
+
     await this.loadStoredTokens();
 
     if (this.accessToken && Date.now() < this.tokenExpiresAt - 60_000) {
       return this.accessToken;
-    }
-
-    if (this.serviceAccountFile) {
-      return this.authenticateServiceAccount();
     }
 
     if (this.refreshToken && this.clientId && this.clientSecret) {
@@ -159,7 +163,7 @@ export class GoogleDriveClient {
     if (this.accessToken) return this.accessToken;
 
     throw new Error(
-      "Google Drive is not signed in. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET, then run npm run auth:googledrive."
+      "Google Drive is not signed in. Set GOOGLE_SERVICE_ACCOUNT_FILE, or GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET then run npm run auth:googledrive."
     );
   }
 
@@ -205,7 +209,7 @@ export class GoogleDriveClient {
       assertion,
     });
 
-    const response = await fetch(TOKEN_URL, {
+    const response = await googleFetch(TOKEN_URL, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body,
@@ -230,7 +234,7 @@ export class GoogleDriveClient {
       refresh_token: this.refreshToken,
     });
 
-    const response = await fetch(TOKEN_URL, {
+    const response = await googleFetch(TOKEN_URL, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body,
@@ -277,7 +281,7 @@ export class GoogleDriveClient {
 
     let attempt = 0;
     while (true) {
-      const response = await fetch(url, {
+      const response = await googleFetch(url, {
         method: "GET",
         headers: {
           Authorization: `Bearer ${this.accessToken}`,
@@ -419,6 +423,23 @@ export class GoogleDriveClient {
       if (!pageToken) break;
     }
   }
+}
+
+function googleFetch(url, options) {
+  return fetch(url, options).catch((err) => {
+    const cause = err.cause;
+    const detail = cause?.code || cause?.message || err.message;
+    let host = url;
+    try {
+      host = new URL(url).host;
+    } catch {
+      /* keep raw url */
+    }
+    throw new Error(
+      `Google Drive network error calling ${host}: ${detail}. ` +
+        "Check internet/VPN/DNS/proxy; oauth2.googleapis.com and www.googleapis.com must be reachable."
+    );
+  });
 }
 
 function sleep(ms) {

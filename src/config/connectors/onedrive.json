@@ -1,0 +1,27 @@
+{
+  "connector": "onedrive",
+  "objects": {
+    "drives": {
+      "enabled": true,
+      "fields": {
+        "id": "id",
+        "name": "name",
+        "driveType": "driveType",
+        "webUrl": "webUrl"
+      }
+    },
+    "driveItems": {
+      "enabled": true,
+      "fields": {
+        "id": "id",
+        "name": "name",
+        "size": "size",
+        "webUrl": "webUrl",
+        "createdDateTime": "createdDateTime",
+        "lastModifiedDateTime": "lastModifiedDateTime",
+        "parentReference.path": "parentPath",
+        "file.mimeType": "mimeType"
+      }
+    }
+  }
+}

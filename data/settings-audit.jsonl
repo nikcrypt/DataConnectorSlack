@@ -21,3 +21,6 @@
 {"at":"2026-10-28T05:58:06.288Z","action":"login","username":"viewer","role":"viewer"}
 {"at":"2026-10-28T05:58:06.309Z","action":"extract_run","username":"viewer","role":"viewer","connector":"slack","mode":"full","target":"jsonl","objects":["users"],"requestId":"61beadbd-299f-4e0e-af89-bffab43f5ab6"}
 {"at":"2026-10-28T05:58:06.371Z","action":"login","username":"admin","role":"admin"}
+{"at":"2026-10-28T05:59:19.329Z","action":"login","username":"admin","role":"admin"}
+{"at":"2026-10-28T05:59:33.596Z","action":"logout","username":"admin","role":"admin"}
+{"at":"2026-10-28T05:59:42.271Z","action":"login","username":"viewer","role":"viewer"}
