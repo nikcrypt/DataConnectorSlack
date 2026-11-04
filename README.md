@@ -10,7 +10,7 @@ QA can run every connector from one container. See [docs/qa-docker.md](docs/qa-d
 |---|---|---|
 | **slack** | workspaces, users, channels, messages, … | `data/output/slack/*.jsonl` |
 | **postgres** | schemas, tables, views, columns | `data/output/postgres/*.jsonl` |
-| **mysql** | schemas, tables, views, columns | `data/output/mysql/*.jsonl` |
+| **mysql** | schemas, tables, views, columns, table_data | `data/output/mysql/*.jsonl` |
 | **oracle** | schemas, tables, views, columns | `data/output/oracle/*.jsonl` |
 | **sharepoint** | sites, lists, columns, listItems, drives, driveItems | `data/output/sharepoint/*.jsonl` |
 | **salesforce** | sobjects, fields, records | `data/output/salesforce/*.jsonl` |
@@ -360,7 +360,9 @@ CLI → OracleConnector → OracleClient → Oracle Database
 
 # MySQL Connector
 
-Extract **database metadata** from MySQL via `information_schema` (not table row data). System schemas `mysql`, `information_schema`, `performance_schema`, and `sys` are skipped unless you list them in `MYSQL_SCHEMAS`.
+Extract **database metadata** from MySQL via `information_schema`. System schemas `mysql`, `information_schema`, `performance_schema`, and `sys` are skipped unless you list them in `MYSQL_SCHEMAS`.
+
+Objects: `schemas`, `tables`, `views`, `columns`, plus optional **`table_data`** (actual row pages). Limit row reads with `MYSQL_SCHEMA` + `MYSQL_TABLE`.
 
 ## 1. Configure `.env`
 
@@ -372,6 +374,10 @@ MYSQL_USER=connector_reader
 MYSQL_PASSWORD=your-password
 MYSQL_SSL=false
 # MYSQL_SCHEMAS=appdb
+# MYSQL_SCHEMA=appdb
+# MYSQL_TABLE=orders
+# MYSQL_PAGE_SIZE=1000
+# MYSQL_MODIFIED_COLUMN=updated_at
 ```
 
 Or a URL:
@@ -386,6 +392,8 @@ MYSQL_URL=mysql://connector_reader:password@localhost:3306/appdb
 npm run test:mysql
 npm run extract:mysql
 npm run extract -- --connector mysql --objects schemas,tables,columns
+# row data for one table (set MYSQL_SCHEMA + MYSQL_TABLE in .env)
+npm run extract -- --connector mysql --objects table_data
 ```
 
 Output: `data/output/mysql/*.jsonl`

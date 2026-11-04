@@ -3,8 +3,7 @@ import mysql from "mysql2/promise";
 const SYSTEM_SCHEMAS = ["mysql", "information_schema", "performance_schema", "sys"];
 
 /**
- * MySQL client for catalog queries via information_schema.
- * Extracts metadata the connected user can see — not table row data.
+ * MySQL client for catalog + optional table row reads.
  */
 export class MysqlClient {
   /**
@@ -103,6 +102,24 @@ export class MysqlClient {
       clause: `AND ${column} NOT IN (${placeholders})`,
       params: [...SYSTEM_SCHEMAS],
     };
+  }
+
+  /**
+   * @param {string} schemaName
+   * @param {string} tableName
+   * @returns {Promise<string[]>}
+   */
+  async getTableColumns(schemaName, tableName) {
+    const rows = await this.query(
+      `
+      SELECT COLUMN_NAME AS column_name
+      FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?
+      ORDER BY ORDINAL_POSITION
+      `,
+      [schemaName, tableName]
+    );
+    return rows.map((row) => row.column_name);
   }
 }
 
