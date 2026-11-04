@@ -1,9 +1,9 @@
 import oracledb from "oracledb";
 
 /**
- * Oracle catalog client.
- * Uses node-oracledb thin mode (no Instant Client) against ALL_* views.
- * Extracts metadata the connected user can see — not table row data.
+ * Oracle client.
+ * Uses node-oracledb thin mode (no Instant Client) against ALL_* views
+ * for catalog metadata, plus optional table row reads.
  */
 
 const SYSTEM_OWNERS = [
@@ -144,6 +144,27 @@ export class OracleClient {
       };
     }
     return { clause: SYSTEM_OWNER_SQL.replaceAll("owner", column), binds: {} };
+  }
+
+  /**
+   * @param {string} schemaName
+   * @param {string} tableName
+   * @returns {Promise<string[]>}
+   */
+  async getTableColumns(schemaName, tableName) {
+    const rows = await this.query(
+      `
+      SELECT column_name
+      FROM all_tab_columns
+      WHERE owner = :owner AND table_name = :table_name
+      ORDER BY column_id
+      `,
+      {
+        owner: String(schemaName).toUpperCase(),
+        table_name: String(tableName).toUpperCase(),
+      }
+    );
+    return rows.map((row) => row.COLUMN_NAME);
   }
 }
 

@@ -11,7 +11,7 @@ QA can run every connector from one container. See [docs/qa-docker.md](docs/qa-d
 | **slack** | workspaces, users, channels, messages, … | `data/output/slack/*.jsonl` |
 | **postgres** | schemas, tables, views, columns | `data/output/postgres/*.jsonl` |
 | **mysql** | schemas, tables, views, columns, table_data | `data/output/mysql/*.jsonl` |
-| **oracle** | schemas, tables, views, columns | `data/output/oracle/*.jsonl` |
+| **oracle** | schemas, tables, views, columns, table_data | `data/output/oracle/*.jsonl` |
 | **sharepoint** | sites, lists, columns, listItems, drives, driveItems | `data/output/sharepoint/*.jsonl` |
 | **salesforce** | sobjects, fields, records | `data/output/salesforce/*.jsonl` |
 | **jira** | projects, issues, users, statuses, issueTypes | `data/output/jira/*.jsonl` |
@@ -311,7 +311,9 @@ CLI → PostgresConnector → PostgresClient → PostgreSQL
 
 # Oracle Connector
 
-Extract **database metadata** from Oracle via `ALL_*` catalog views (not table row data). Uses `node-oracledb` thin mode, so Oracle Instant Client is not required.
+Extract **database metadata** from Oracle via `ALL_*` catalog views. Uses `node-oracledb` thin mode, so Oracle Instant Client is not required.
+
+Objects: `schemas`, `tables`, `views`, `columns`, plus optional **`table_data`** (actual row pages). Limit row reads with `ORACLE_SCHEMA` + `ORACLE_TABLE`.
 
 ## 1. Configure `.env`
 
@@ -320,6 +322,10 @@ ORACLE_USER=app_reader
 ORACLE_PASSWORD=your-password
 ORACLE_CONNECT_STRING=localhost:1521/XEPDB1
 # ORACLE_SCHEMAS=HR,APP
+# ORACLE_SCHEMA=HR
+# ORACLE_TABLE=EMPLOYEES
+# ORACLE_PAGE_SIZE=1000
+# ORACLE_MODIFIED_COLUMN=UPDATED_AT
 ```
 
 Or host parts instead of a connect string:
@@ -338,6 +344,8 @@ The account needs `SELECT` on the objects you want listed (`ALL_TABLES`, `ALL_VI
 npm run test:oracle
 npm run extract:oracle
 npm run extract -- --connector oracle --objects schemas,tables,columns
+# row data for one table (set ORACLE_SCHEMA + ORACLE_TABLE in .env)
+npm run extract -- --connector oracle --objects table_data
 ```
 
 Output: `data/output/oracle/*.jsonl`
