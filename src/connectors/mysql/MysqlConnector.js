@@ -3,7 +3,8 @@ import { DataConnector } from "../base/DataConnector.js";
 import { incrementalWindow } from "../base/incrementalWindow.js";
 import { MysqlClient } from "./MysqlClient.js";
 
-const OBJECTS = ["schemas", "tables", "views", "columns", "table_data"];
+const METADATA_OBJECTS = ["schemas", "tables", "views", "columns"];
+const OBJECTS = [...METADATA_OBJECTS, "table_data"];
 const CHECKPOINT_OBJECTS = new Set(["tables", "columns", "table_data"]);
 const DATE_TYPES = new Set([
   "date",
@@ -80,6 +81,11 @@ export class MysqlConnector extends DataConnector {
 
   getObjects() {
     return [...OBJECTS];
+  }
+
+  /** Metadata only — table_data is opt-in via --objects table_data */
+  getDefaultObjects() {
+    return [...METADATA_OBJECTS];
   }
 
   async testConnection() {
@@ -262,38 +268,39 @@ export class MysqlConnector extends DataConnector {
   }
 
   /**
-   * Read actual table rows (paginated). Limit with MYSQL_SCHEMA + MYSQL_TABLE.
+   * Read actual table rows (paginated).
+   * Requires MYSQL_SCHEMA + MYSQL_TABLE so extracts do not scan the whole DB.
    */
   async *extractTableData(options = {}) {
-    const filter = this.client.schemaFilter(this.allowedSchemas, "TABLE_SCHEMA");
-    const params = [...filter.params];
-    let whereExtra = "";
+    if (!this.schemaName || !this.tableName) {
+      throw new Error(
+        "MySQL table_data requires MYSQL_SCHEMA and MYSQL_TABLE in .env " +
+          "(example: MYSQL_SCHEMA=appdb, MYSQL_TABLE=orders)."
+      );
+    }
 
-    if (this.schemaName) {
-      whereExtra += " AND TABLE_SCHEMA = ?";
-      params.push(this.schemaName);
-    }
-    if (this.tableName) {
-      whereExtra += " AND TABLE_NAME = ?";
-      params.push(this.tableName);
-    }
+    const filter = this.client.schemaFilter(this.allowedSchemas, "TABLE_SCHEMA");
+    const params = [...filter.params, this.schemaName, this.tableName];
 
     const tables = await this.client.query(
       `
       SELECT TABLE_SCHEMA AS table_schema, TABLE_NAME AS table_name
       FROM information_schema.TABLES
-      WHERE TABLE_TYPE = 'BASE TABLE' ${filter.clause}${whereExtra}
+      WHERE TABLE_TYPE = 'BASE TABLE' ${filter.clause}
+        AND TABLE_SCHEMA = ?
+        AND TABLE_NAME = ?
       ORDER BY TABLE_SCHEMA, TABLE_NAME
       `,
       params
     );
 
-    const window = incrementalWindow(options);
-    if (!window && !this.schemaName && !this.tableName) {
-      console.log(
-        "[mysql] table_data will read every user table. Set MYSQL_SCHEMA and MYSQL_TABLE to limit it."
+    if (!tables.length) {
+      throw new Error(
+        `MySQL table not found or not visible: ${this.schemaName}.${this.tableName}`
       );
     }
+
+    const window = incrementalWindow(options);
     if (window) {
       console.log(
         `[mysql] incremental table rows modified from ${window.since.toISOString()} until ${window.until.toISOString()}`
@@ -310,19 +317,21 @@ export class MysqlConnector extends DataConnector {
 
       const fullTableName = `${quoteIdentifier(schemaName)}.${quoteIdentifier(tableName)}`;
       const tableColumns = await this.client.getTableColumns(schemaName, tableName);
-      const orderBy = tableColumns.length
-        ? tableColumns.map((column) => quoteIdentifier(column)).join(", ")
+      const pkColumns = await this.primaryKeyColumns(schemaName, tableName);
+      const orderColumns = pkColumns.length ? pkColumns : tableColumns.slice(0, 1);
+      const orderBy = orderColumns.length
+        ? orderColumns.map((column) => quoteIdentifier(column)).join(", ")
         : "1";
 
-      const totalRowsResult = await this.client.query(
-        `SELECT COUNT(*) AS total_rows FROM ${fullTableName}`
+      console.log(
+        `[mysql] table_data ${schemaName}.${tableName} pageSize=${this.pageSize} orderBy=${orderColumns.join(",") || "1"}`
       );
-      const totalRows = Number(totalRowsResult[0]?.total_rows || 0);
 
       let offset = 0;
       let pageNumber = 0;
+      let extractedRows = 0;
 
-      while (offset < totalRows) {
+      while (true) {
         const pageRows = await this.client.query(
           `
           SELECT * FROM ${fullTableName}
@@ -341,6 +350,8 @@ export class MysqlConnector extends DataConnector {
           }
           return out;
         });
+        extractedRows += dataRows.length;
+        const hasMore = pageRows.length >= this.pageSize;
 
         const sourceId = `${schemaName}.${tableName}.page-${pageNumber}`;
         yield this.record("table_data", sourceId, {
@@ -349,24 +360,28 @@ export class MysqlConnector extends DataConnector {
           pageNumber,
           pageSize: this.pageSize,
           offset,
-          totalRows,
+          totalRows: null,
           rowCount: dataRows.length,
           columns,
           rows: dataRows,
-          hasMore: offset + dataRows.length < totalRows,
+          hasMore,
         }, {
           schemaName,
           tableName,
           pageNumber,
           offset,
-          totalRows,
           pageSize: this.pageSize,
           rowCount: dataRows.length,
           rows: dataRows,
         });
 
         offset += pageRows.length;
+        if (!hasMore) break;
       }
+
+      console.log(
+        `[mysql] table_data ${schemaName}.${tableName} done (${extractedRows} rows, ${pageNumber} pages)`
+      );
     }
   }
 

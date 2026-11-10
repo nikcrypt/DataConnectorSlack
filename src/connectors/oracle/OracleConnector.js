@@ -3,7 +3,8 @@ import { DataConnector } from "../base/DataConnector.js";
 import { incrementalWindow } from "../base/incrementalWindow.js";
 import { OracleClient } from "./OracleClient.js";
 
-const OBJECTS = ["schemas", "tables", "views", "columns", "table_data"];
+const METADATA_OBJECTS = ["schemas", "tables", "views", "columns"];
+const OBJECTS = [...METADATA_OBJECTS, "table_data"];
 const CHECKPOINT_OBJECTS = new Set(["tables", "views", "columns", "table_data"]);
 const DATE_TYPE_PREFIXES = ["DATE", "TIMESTAMP"];
 const MODIFIED_COLUMN_NAMES = [
@@ -69,6 +70,11 @@ export class OracleConnector extends DataConnector {
 
   getObjects() {
     return [...OBJECTS];
+  }
+
+  /** Metadata only — table_data is opt-in via --objects table_data */
+  getDefaultObjects() {
+    return [...METADATA_OBJECTS];
   }
 
   async testConnection() {
@@ -261,39 +267,44 @@ export class OracleConnector extends DataConnector {
   }
 
   /**
-   * Read actual table rows (paginated). Limit with ORACLE_SCHEMA + ORACLE_TABLE.
+   * Read actual table rows (paginated).
+   * Requires ORACLE_SCHEMA + ORACLE_TABLE so extracts do not scan the whole DB.
    */
   async *extractTableData(options = {}) {
-    const filter = this.client.ownerFilter(this.allowedSchemas, "t.owner");
-    const binds = { ...filter.binds };
-    let whereExtra = "";
+    if (!this.schemaName || !this.tableName) {
+      throw new Error(
+        "Oracle table_data requires ORACLE_SCHEMA and ORACLE_TABLE in .env " +
+          "(example: ORACLE_SCHEMA=HR, ORACLE_TABLE=EMPLOYEES)."
+      );
+    }
 
-    if (this.schemaName) {
-      whereExtra += " AND t.owner = :schema_name";
-      binds.schema_name = this.schemaName.toUpperCase();
-    }
-    if (this.tableName) {
-      whereExtra += " AND t.table_name = :table_name";
-      binds.table_name = this.tableName.toUpperCase();
-    }
+    const filter = this.client.ownerFilter(this.allowedSchemas, "t.owner");
+    const binds = {
+      ...filter.binds,
+      schema_name: this.schemaName.toUpperCase(),
+      table_name: this.tableName.toUpperCase(),
+    };
 
     const tables = await this.client.query(
       `
       SELECT t.owner AS schema_name, t.table_name
       FROM all_tables t
       WHERE 1 = 1
-      ${filter.clause}${whereExtra}
+      ${filter.clause}
+        AND t.owner = :schema_name
+        AND t.table_name = :table_name
       ORDER BY t.owner, t.table_name
       `,
       binds
     );
 
-    const window = incrementalWindow(options);
-    if (!window && !this.schemaName && !this.tableName) {
-      console.log(
-        "[oracle] table_data will read every visible user table. Set ORACLE_SCHEMA and ORACLE_TABLE to limit it."
+    if (!tables.length) {
+      throw new Error(
+        `Oracle table not found or not visible: ${this.schemaName}.${this.tableName}`
       );
     }
+
+    const window = incrementalWindow(options);
     if (window) {
       console.log(
         `[oracle] incremental table rows modified from ${window.since.toISOString()} until ${window.until.toISOString()}`
@@ -310,19 +321,24 @@ export class OracleConnector extends DataConnector {
 
       const fullTableName = `${quoteIdentifier(schemaName)}.${quoteIdentifier(tableName)}`;
       const tableColumns = await this.client.getTableColumns(schemaName, tableName);
-      const orderBy = tableColumns.length
-        ? tableColumns.map((column) => quoteIdentifier(column)).join(", ")
+      const pkColumns = await this.primaryKeyColumns(schemaName, tableName);
+      const orderColumns = pkColumns.length
+        ? pkColumns
+        : tableColumns.slice(0, 1);
+      const orderBy = orderColumns.length
+        ? orderColumns.map((column) => quoteIdentifier(column)).join(", ")
         : "1";
 
-      const totalRowsResult = await this.client.query(
-        `SELECT COUNT(*) AS total_rows FROM ${fullTableName}`
+      console.log(
+        `[oracle] table_data ${schemaName}.${tableName} pageSize=${this.pageSize} orderBy=${orderColumns.join(",") || "1"}`
       );
-      const totalRows = Number(totalRowsResult[0]?.TOTAL_ROWS || 0);
 
+      // Skip COUNT(*) — it is expensive on large tables. Stop when a page is short.
       let offset = 0;
       let pageNumber = 0;
+      let extractedRows = 0;
 
-      while (offset < totalRows) {
+      while (true) {
         const pageRows = await this.client.query(
           `
           SELECT * FROM ${fullTableName}
@@ -336,6 +352,8 @@ export class OracleConnector extends DataConnector {
         pageNumber += 1;
         const columns = tableColumns.length ? tableColumns : Object.keys(pageRows[0] || {});
         const dataRows = pageRows.map((row) => rowToObject(row, columns));
+        extractedRows += dataRows.length;
+        const hasMore = pageRows.length >= this.pageSize;
 
         const sourceId = `${schemaName}.${tableName}.page-${pageNumber}`;
         yield this.record("table_data", sourceId, {
@@ -344,24 +362,28 @@ export class OracleConnector extends DataConnector {
           pageNumber,
           pageSize: this.pageSize,
           offset,
-          totalRows,
+          totalRows: null,
           rowCount: dataRows.length,
           columns,
           rows: dataRows,
-          hasMore: offset + dataRows.length < totalRows,
+          hasMore,
         }, {
           schemaName,
           tableName,
           pageNumber,
           offset,
-          totalRows,
           pageSize: this.pageSize,
           rowCount: dataRows.length,
           rows: dataRows,
         });
 
         offset += pageRows.length;
+        if (!hasMore) break;
       }
+
+      console.log(
+        `[oracle] table_data ${schemaName}.${tableName} done (${extractedRows} rows, ${pageNumber} pages)`
+      );
     }
   }
 

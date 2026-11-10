@@ -25,7 +25,9 @@ export class MongoRuntime {
   }
 
   async run({ objects, mode = "full", checkpoint, startedAt } = {}) {
-    const selected = objects?.length ? objects : this.connector.getObjects();
+    const selected = objects?.length
+      ? objects
+      : (this.connector.getDefaultObjects?.() || this.connector.getObjects());
     const client = this.createClient(this.uri);
     const runId = randomUUID();
     const runStartedAt = new Date(startedAt || Date.now());

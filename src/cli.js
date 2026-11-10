@@ -175,7 +175,9 @@ async function main() {
 
   if (args.command === "extract") {
     const runtime = new ConnectorRuntimeEngine(connector);
-    const objects = args.objects || connector.getObjects();
+    const objects = args.objects
+      || connector.getDefaultObjects?.()
+      || connector.getObjects();
     const known = new Set(connector.getObjects());
     const unknown = objects.filter((object) => !known.has(object));
     if (unknown.length) {
@@ -192,7 +194,9 @@ async function main() {
   }
 
   if (args.command === "extract-mongo") {
-    const objects = args.objects || connector.getObjects();
+    const objects = args.objects
+      || connector.getDefaultObjects?.()
+      || connector.getObjects();
     const known = new Set(connector.getObjects());
     const unknown = objects.filter((object) => !known.has(object));
     if (unknown.length) {

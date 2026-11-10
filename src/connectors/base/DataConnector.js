@@ -13,6 +13,15 @@ export class DataConnector {
   }
 
   /**
+   * Objects used when the caller does not pass --objects.
+   * Override to keep heavy objects (e.g. table_data) opt-in only.
+   * @returns {string[]}
+   */
+  getDefaultObjects() {
+    return this.getObjects();
+  }
+
+  /**
    * Async generator: yields one normalised record at a time.
    * @param {string} object
    * @param {object} [options]
