@@ -248,6 +248,7 @@ Slack:
 Postgres:
   POSTGRES_URL or HOST/DATABASE/USER/PASSWORD
   Optional: POSTGRES_SCHEMAS
+  table_data rows: POSTGRES_SCHEMA + POSTGRES_TABLE (required), POSTGRES_PAGE_SIZE, POSTGRES_MODIFIED_COLUMN
   Incremental view changes need track_commit_timestamp=on on the server
 
 ServiceNow:

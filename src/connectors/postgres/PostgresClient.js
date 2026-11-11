@@ -3,7 +3,7 @@ import pg from "pg";
 const { Client } = pg;
 
 /**
- * Thin PostgreSQL client for catalog queries via information_schema.
+ * PostgreSQL client for catalog metadata and optional table row reads.
  */
 export class PostgresClient {
   /**
@@ -123,5 +123,23 @@ export class PostgresClient {
       clause: "AND table_schema NOT IN ('pg_catalog', 'information_schema', 'pg_toast')",
       params: [],
     };
+  }
+
+  /**
+   * @param {string} schemaName
+   * @param {string} tableName
+   * @returns {Promise<string[]>}
+   */
+  async getTableColumns(schemaName, tableName) {
+    const rows = await this.query(
+      `
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_schema = $1 AND table_name = $2
+      ORDER BY ordinal_position
+      `,
+      [schemaName, tableName]
+    );
+    return rows.map((row) => row.column_name);
   }
 }

@@ -9,7 +9,7 @@ QA can run every connector from one container. See [docs/qa-docker.md](docs/qa-d
 | Connector | Objects | Output |
 |---|---|---|
 | **slack** | workspaces, users, channels, messages, … | `data/output/slack/*.jsonl` |
-| **postgres** | schemas, tables, views, columns | `data/output/postgres/*.jsonl` |
+| **postgres** | schemas, tables, views, columns, table_data | `data/output/postgres/*.jsonl` |
 | **mysql** | schemas, tables, views, columns, table_data | `data/output/mysql/*.jsonl` |
 | **oracle** | schemas, tables, views, columns, table_data | `data/output/oracle/*.jsonl` |
 | **sharepoint** | sites, lists, columns, listItems, drives, driveItems | `data/output/sharepoint/*.jsonl` |
@@ -244,7 +244,7 @@ File **binary** download remains out of scope; only file metadata is extracted.
 
 # PostgreSQL Connector
 
-Extract **database metadata** from PostgreSQL via `information_schema` (not table row data).
+Extract **database metadata** from PostgreSQL via `information_schema`. Objects: `schemas`, `tables`, `views`, `columns`, plus optional **`table_data`** (actual row pages). Limit row reads with `POSTGRES_SCHEMA` + `POSTGRES_TABLE`.
 
 ## 1. Database setup
 
@@ -254,7 +254,8 @@ Create a read-only role (example):
 CREATE ROLE connector_reader LOGIN PASSWORD 'your-password';
 GRANT CONNECT ON DATABASE appdb TO connector_reader;
 GRANT USAGE ON SCHEMA public TO connector_reader;
--- metadata usually works with USAGE; add SELECT if your setup requires it
+-- metadata usually works with USAGE; add SELECT on tables for table_data
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO connector_reader;
 ```
 
 ## 2. Configure `.env`
@@ -279,6 +280,10 @@ POSTGRES_USER=connector_reader
 POSTGRES_PASSWORD=your-password
 POSTGRES_SSL=false
 # POSTGRES_SCHEMAS=public
+# POSTGRES_SCHEMA=public
+# POSTGRES_TABLE=orders
+# POSTGRES_PAGE_SIZE=1000
+# POSTGRES_MODIFIED_COLUMN=updated_at
 ```
 
 ## 3. Run
@@ -287,9 +292,11 @@ POSTGRES_SSL=false
 npm run test:postgres
 npm run extract:postgres
 npm run extract -- --connector postgres --objects schemas,tables,columns
+# row data for one table (set POSTGRES_SCHEMA + POSTGRES_TABLE in .env)
+npm run extract -- --connector postgres --objects table_data
 ```
 
-Output: `data/output/postgres/schemas.jsonl`, `tables.jsonl`, `views.jsonl`, `columns.jsonl`
+Output: `data/output/postgres/schemas.jsonl`, `tables.jsonl`, `views.jsonl`, `columns.jsonl` (and `table_data.jsonl` when requested)
 
 ## Project layout (Postgres)
 
