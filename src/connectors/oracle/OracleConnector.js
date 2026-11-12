@@ -2,7 +2,12 @@ import { createHash } from "node:crypto";
 import { DataConnector } from "../base/DataConnector.js";
 import { incrementalWindow } from "../base/incrementalWindow.js";
 import { resolveTableDataTargets } from "../base/resolveTableDataTargets.js";
+import loggerFactory from "../../logger.js";
 import { OracleClient } from "./OracleClient.js";
+
+const logger = loggerFactory.component("Oracle", {
+  connector: "Oracle"
+});
 
 const METADATA_OBJECTS = ["schemas", "tables", "views", "columns"];
 const OBJECTS = [...METADATA_OBJECTS, "table_data"];
@@ -99,6 +104,10 @@ export class OracleConnector extends DataConnector {
   }
 
   async *extract(object, options = {}) {
+    logger.info("ExtractionStarted", {
+      object,
+      incremental: Boolean(options.checkpoint)
+    });
     if (!OBJECTS.includes(object)) {
       throw new Error(`Unknown Oracle object: ${object}`);
     }
@@ -126,6 +135,9 @@ export class OracleConnector extends DataConnector {
         default:
           throw new Error(`Extract not implemented for ${object}`);
       }
+      logger.info("ExtractionCompleted", {
+        object
+      });
     } finally {
       await this.client.disconnect();
     }
@@ -157,7 +169,7 @@ export class OracleConnector extends DataConnector {
       FROM dual
     `);
     const offsetMs = Math.round(Number(rows[0]?.OFFSET_MINUTES || 0)) * 60 * 1000;
-    console.log(
+    logger.info(
       `[oracle] incremental catalog changes from ${window.since.toISOString()} until ${window.until.toISOString()}`
     );
     return {
@@ -295,7 +307,7 @@ export class OracleConnector extends DataConnector {
 
     const window = incrementalWindow(options);
     if (window) {
-      console.log(
+      logger.info(
         `[oracle] incremental table rows modified from ${window.since.toISOString()} until ${window.until.toISOString()}`
       );
     }
@@ -318,7 +330,7 @@ export class OracleConnector extends DataConnector {
         ? orderColumns.map((column) => quoteIdentifier(column)).join(", ")
         : "1";
 
-      console.log(
+      logger.info(
         `[oracle] table_data ${schemaName}.${tableName} pageSize=${this.pageSize} orderBy=${orderColumns.join(",") || "1"}`
       );
 
@@ -370,7 +382,7 @@ export class OracleConnector extends DataConnector {
         if (!hasMore) break;
       }
 
-      console.log(
+      logger.info(
         `[oracle] table_data ${schemaName}.${tableName} done (${extractedRows} rows, ${pageNumber} pages)`
       );
     }
@@ -396,7 +408,7 @@ export class OracleConnector extends DataConnector {
         }
       );
       if (!rows.length) {
-        console.log(
+        logger.info(
           `[oracle] table_data skipped missing table ${target.schemaName}.${target.tableName}`
         );
         continue;
@@ -410,7 +422,7 @@ export class OracleConnector extends DataConnector {
     const column = await this.findModifiedColumn(schemaName, tableName);
     const qualified = `${schemaName}.${tableName}`;
     if (!column) {
-      console.log(
+      logger.info(
         `[oracle] incremental table_data skipped ${qualified}: no date/timestamp modified column. Set ORACLE_MODIFIED_COLUMN.`
       );
       return;
@@ -423,7 +435,7 @@ export class OracleConnector extends DataConnector {
       since_ts: sqlDateLiteral(window.since),
       until_ts: sqlDateLiteral(window.until),
     };
-    console.log(`[oracle] incremental ${qualified} using ${column}`);
+    logger.info(`[oracle] incremental ${qualified} using ${column}`);
 
     const tableColumns = await this.client.getTableColumns(schemaName, tableName);
     const pkColumns = await this.primaryKeyColumns(schemaName, tableName);
@@ -506,7 +518,7 @@ export class OracleConnector extends DataConnector {
       const isDate = DATE_TYPE_PREFIXES.some((prefix) => dataType.startsWith(prefix));
       if (!isDate) {
         if (this.modifiedColumn) {
-          console.log(
+          logger.info(
             `[oracle] ${schemaName}.${tableName}.${row.COLUMN_NAME} is ${row.DATA_TYPE}, not a date/timestamp column`
           );
         }

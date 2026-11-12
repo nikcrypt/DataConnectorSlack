@@ -1,4 +1,9 @@
 import mysql from "mysql2/promise";
+import loggerFactory from "../../logger.js";
+
+const logger = loggerFactory.component("MySQL", {
+  connector: "MySQL"
+});
 
 const SYSTEM_SCHEMAS = ["mysql", "information_schema", "performance_schema", "sys"];
 
@@ -76,6 +81,11 @@ export class MysqlClient {
       "SELECT DATABASE() AS database_name, CURRENT_USER() AS session_user, VERSION() AS version"
     );
     const row = rows[0] || {};
+    logger.info("ConnectionTestSucceeded", {
+      database: row.database_name || null,
+      user: row.session_user || null,
+      version: row.version || null
+    });
     return {
       ok: true,
       database: row.database_name || null,

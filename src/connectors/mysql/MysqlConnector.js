@@ -2,7 +2,12 @@ import { createHash } from "node:crypto";
 import { DataConnector } from "../base/DataConnector.js";
 import { incrementalWindow } from "../base/incrementalWindow.js";
 import { resolveTableDataTargets } from "../base/resolveTableDataTargets.js";
+import loggerFactory from "../../logger.js";
 import { MysqlClient } from "./MysqlClient.js";
+
+const logger = loggerFactory.component("MySQL", {
+  connector: "MySQL"
+});
 
 const METADATA_OBJECTS = ["schemas", "tables", "views", "columns"];
 const OBJECTS = [...METADATA_OBJECTS, "table_data"];
@@ -110,6 +115,10 @@ export class MysqlConnector extends DataConnector {
   }
 
   async *extract(object, options = {}) {
+    logger.info("ExtractionStarted", {
+      object,
+      incremental: Boolean(options.checkpoint)
+    });
     if (!OBJECTS.includes(object)) {
       throw new Error(`Unknown MySQL object: ${object}`);
     }
@@ -137,6 +146,9 @@ export class MysqlConnector extends DataConnector {
         default:
           throw new Error(`Extract not implemented for ${object}`);
       }
+      logger.info("ExtractionCompleted", {
+        object
+      });
     } finally {
       await this.client.disconnect();
     }
@@ -149,7 +161,7 @@ export class MysqlConnector extends DataConnector {
       "SELECT TIMESTAMPDIFF(MINUTE, UTC_TIMESTAMP(), NOW()) AS offset_minutes"
     );
     const offsetMs = Math.round(Number(rows[0]?.offset_minutes || 0)) * 60 * 1000;
-    console.log(
+    logger.info(
       `[mysql] incremental catalog changes from ${window.since.toISOString()} until ${window.until.toISOString()}`
     );
     return {
@@ -293,7 +305,7 @@ export class MysqlConnector extends DataConnector {
 
     const window = incrementalWindow(options);
     if (window) {
-      console.log(
+      logger.info(
         `[mysql] incremental table rows modified from ${window.since.toISOString()} until ${window.until.toISOString()}`
       );
     }
@@ -314,7 +326,7 @@ export class MysqlConnector extends DataConnector {
         ? orderColumns.map((column) => quoteIdentifier(column)).join(", ")
         : "1";
 
-      console.log(
+      logger.info(
         `[mysql] table_data ${schemaName}.${tableName} pageSize=${this.pageSize} orderBy=${orderColumns.join(",") || "1"}`
       );
 
@@ -370,7 +382,7 @@ export class MysqlConnector extends DataConnector {
         if (!hasMore) break;
       }
 
-      console.log(
+      logger.info(
         `[mysql] table_data ${schemaName}.${tableName} done (${extractedRows} rows, ${pageNumber} pages)`
       );
     }
@@ -391,7 +403,7 @@ export class MysqlConnector extends DataConnector {
         [...filter.params, target.schemaName, target.tableName]
       );
       if (!rows.length) {
-        console.log(
+        logger.info(
           `[mysql] table_data skipped missing table ${target.schemaName}.${target.tableName}`
         );
         continue;
@@ -405,7 +417,7 @@ export class MysqlConnector extends DataConnector {
     const column = await this.findModifiedColumn(schemaName, tableName);
     const qualified = `${schemaName}.${tableName}`;
     if (!column) {
-      console.log(
+      logger.info(
         `[mysql] incremental table_data skipped ${qualified}: no datetime modified column. Set MYSQL_MODIFIED_COLUMN.`
       );
       return;
@@ -415,7 +427,7 @@ export class MysqlConnector extends DataConnector {
     const quotedColumn = quoteIdentifier(column);
     const rowFilter = `${quotedColumn} >= ? AND ${quotedColumn} < ?`;
     const filterParams = [sqlDateLiteral(window.since), sqlDateLiteral(window.until)];
-    console.log(`[mysql] incremental ${qualified} using ${column}`);
+    logger.info(`[mysql] incremental ${qualified} using ${column}`);
 
     const tableColumns = await this.client.getTableColumns(schemaName, tableName);
     const pkColumns = await this.primaryKeyColumns(schemaName, tableName);
@@ -495,7 +507,7 @@ export class MysqlConnector extends DataConnector {
       const dataType = String(row.data_type || "").toLowerCase();
       if (!DATE_TYPES.has(dataType) && !dataType.startsWith("timestamp") && dataType !== "datetime" && dataType !== "date") {
         if (this.modifiedColumn) {
-          console.log(
+          logger.info(
             `[mysql] ${schemaName}.${tableName}.${row.column_name} is ${row.column_type || row.data_type}, not a date column`
           );
         }

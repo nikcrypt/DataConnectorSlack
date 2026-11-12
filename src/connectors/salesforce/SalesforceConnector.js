@@ -2,6 +2,11 @@ import { createHash } from "node:crypto";
 import { DataConnector } from "../base/DataConnector.js";
 import { SalesforceClient } from "./SalesforceClient.js";
 import { incrementalWindow } from "../base/incrementalWindow.js";
+import loggerFactory from "../../logger.js";
+
+const logger = loggerFactory.component("Salesforce", {
+  connector: "Salesforce"
+});
 
 const OBJECTS = ["sobjects", "fields", "records"];
 
@@ -66,6 +71,10 @@ export class SalesforceConnector extends DataConnector {
   }
 
   async *extract(object, options = {}) {
+    logger.info("ExtractionStarted", {
+      object,
+      incremental: Boolean(options.checkpoint)
+    });
     if (!OBJECTS.includes(object)) {
       throw new Error(`Unknown Salesforce object: ${object}`);
     }
@@ -83,6 +92,9 @@ export class SalesforceConnector extends DataConnector {
       default:
         throw new Error(`Extract not implemented for ${object}`);
     }
+    logger.info("ExtractionCompleted", {
+      object
+    });
   }
 
   async *extractSObjects() {
@@ -129,7 +141,7 @@ export class SalesforceConnector extends DataConnector {
           );
         }
       } catch (err) {
-        console.warn(`[salesforce] fields skipped for ${name}:`, err.message);
+        logger.warn(`[salesforce] fields skipped for ${name}:`, { error: err.message });
       }
     }
   }
@@ -137,9 +149,9 @@ export class SalesforceConnector extends DataConnector {
   async *extractRecords(options = {}) {
     const window = incrementalWindow(options);
     if (window) {
-      console.log(`[salesforce] incremental records modified from ${window.since.toISOString()} until ${window.until.toISOString()}`);
+      logger.info(`[salesforce] incremental records modified from ${window.since.toISOString()} until ${window.until.toISOString()}`);
     }
-    console.log(
+    logger.info(
       `[salesforce] record limit per object: ${this.recordLimit} (SALESFORCE_RECORD_LIMIT)`
     );
 
@@ -147,7 +159,7 @@ export class SalesforceConnector extends DataConnector {
       try {
         const describe = await this.client.describeSObject(name);
         if (!describe.queryable) {
-          console.warn(`[salesforce] ${name} is not queryable; skipping records`);
+          logger.warn(`[salesforce] ${name} is not queryable; skipping records`);
           continue;
         }
 
@@ -157,19 +169,19 @@ export class SalesforceConnector extends DataConnector {
           yield* this.extractObjectRecords(name, selected, progress, window);
         } catch (err) {
           if (progress.count > 0) {
-            console.warn(
+            logger.warn(
               `[salesforce] ${name} stopped after ${progress.count} records: ${err.message}`
             );
             continue;
           }
-          console.warn(
+          logger.warn(
             `[salesforce] ${name} query failed, retrying with Id and Name: ${err.message}`
           );
           yield* this.extractObjectRecords(name, ["Id", "Name"], progress, window);
         }
-        console.log(`[salesforce] ${name}: fetched ${progress.count} records`);
+        logger.info(`[salesforce] ${name}: fetched ${progress.count} records`);
       } catch (err) {
-        console.warn(`[salesforce] records skipped for ${name}:`, err.message);
+        logger.warn(`[salesforce] records skipped for ${name}:`, { error: err.message });
       }
     }
   }

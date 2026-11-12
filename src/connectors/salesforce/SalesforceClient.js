@@ -9,6 +9,11 @@
 import { createSign } from "node:crypto";
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import loggerFactory from "../../logger.js";
+
+const logger = loggerFactory.component("Salesforce", {
+  connector: "Salesforce"
+});
 
 const DEFAULT_API_VERSION = "v59.0";
 
@@ -212,6 +217,12 @@ export class SalesforceClient {
       if (response.status === 429 || response.status === 503) {
         const retryAfter = Number(response.headers.get("Retry-After") || 2);
         attempt += 1;
+        logger.warn("RateLimitHit", {
+          endpoint: pathOrUrl,
+          status: response.status,
+          retryAfter,
+          attempt
+        });
         if (attempt > 5) {
           throw new Error(`Salesforce rate limited on ${pathOrUrl}`);
         }
@@ -242,6 +253,10 @@ export class SalesforceClient {
     const auth = await this.authenticate();
     try {
       const identity = await this.request(`${auth.instanceUrl}/services/oauth2/userinfo`);
+      logger.info("ConnectionTestSucceeded", {
+        userId: identity.user_id || null,
+        organizationId: identity.organization_id || null
+      });
       return {
         ok: true,
         instanceUrl: auth.instanceUrl,
@@ -252,6 +267,9 @@ export class SalesforceClient {
       };
     } catch {
       const sobjects = await this.request("/sobjects");
+      logger.info("ConnectionTestSucceeded", {
+        sobjectCount: (sobjects.sobjects || []).length
+      });
       return {
         ok: true,
         instanceUrl: auth.instanceUrl,
@@ -280,7 +298,7 @@ export class SalesforceClient {
 
     while (true) {
       const batch = data.records || [];
-      console.log(
+      logger.info(
         `[salesforce] query page ${page}: ${batch.length} rows, totalSize=${data.totalSize ?? "?"}, done=${Boolean(data.done)}`
       );
       for (const record of batch) {

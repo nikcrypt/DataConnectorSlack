@@ -1,4 +1,9 @@
 import oracledb from "oracledb";
+import loggerFactory from "../../logger.js";
+
+const logger = loggerFactory.component("Oracle", {
+  connector: "Oracle"
+});
 
 /**
  * Oracle client.
@@ -116,6 +121,11 @@ export class OracleClient {
       FROM dual
     `);
     const row = rows[0] || {};
+    logger.info("ConnectionTestSucceeded", {
+      database: row.DATABASE_NAME || null,
+      serviceName: row.SERVICE_NAME || null,
+      user: row.SESSION_USER || null
+    });
     return {
       ok: true,
       database: row.DATABASE_NAME || null,
