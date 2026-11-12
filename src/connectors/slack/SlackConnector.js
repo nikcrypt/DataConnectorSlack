@@ -2,6 +2,11 @@ import { createHash } from "node:crypto";
 import { DataConnector } from "../base/DataConnector.js";
 import { SlackClient, SlackDualClient } from "./SlackClient.js";
 import { incrementalWindow } from "../base/incrementalWindow.js";
+import loggerFactory from "../../logger.js";
+
+const logger = loggerFactory.component("Slack", {
+  connector: "Slack"
+});
 
 const OBJECTS = [
   "workspaces",
@@ -82,6 +87,10 @@ export class SlackConnector extends DataConnector {
    * @param {{ checkpoint?: object, channelIds?: string[] }} [options]
    */
   async *extract(object, options = {}) {
+    logger.info("ExtractionStarted", {
+      object,
+      incremental: Boolean(options.checkpoint)
+    });
     if (!OBJECTS.includes(object)) {
       throw new Error(`Unknown Slack object: ${object}`);
     }
@@ -116,6 +125,9 @@ export class SlackConnector extends DataConnector {
       default:
         throw new Error(`Extract not implemented for ${object}`);
     }
+    logger.info("ExtractionCompleted", {
+      object
+    });
   }
 
   async *extractWorkspaces() {
@@ -190,7 +202,7 @@ export class SlackConnector extends DataConnector {
       }
     } catch (err) {
       if (String(err.message).includes("missing_scope") || String(err.message).includes("not_allowed")) {
-        console.warn("[slack] usergroups.list skipped:", err.message);
+        logger.warn("[slack] usergroups.list skipped:", { error: err.message });
         return;
       }
       throw err;
@@ -255,7 +267,7 @@ export class SlackConnector extends DataConnector {
     const watermark = options.checkpoint?.since || options.checkpoint?.lastSuccessfulAt;
     const since = watermark ? slackTs(watermark) : undefined;
     if (options.mode === "incremental" && since) {
-      console.log(`[slack] incremental messages posted after ${new Date(watermark).toISOString()}`);
+      logger.info(`[slack] incremental messages posted after ${new Date(watermark).toISOString()}`);
     }
 
     for (const channelId of channelIds) {
@@ -292,7 +304,7 @@ export class SlackConnector extends DataConnector {
         }
       } catch (err) {
         // Bot not in channel, or missing scope — skip and continue
-        console.warn(`[slack] history skipped for ${channelId}:`, err.message);
+        logger.warn(`[slack] history skipped for ${channelId}:`, { error: err.message });
       }
     }
   }
@@ -334,7 +346,7 @@ export class SlackConnector extends DataConnector {
           }
         }
       } catch (err) {
-        console.warn(`[slack] threads skipped for ${channelId}:`, err.message);
+        logger.warn(`[slack] threads skipped for ${channelId}:`, { error: err.message });
       }
     }
   }
@@ -392,7 +404,7 @@ export class SlackConnector extends DataConnector {
           }
         }
       } catch (err) {
-        console.warn(`[slack] reactions skipped for ${channelId}:`, err.message);
+        logger.warn(`[slack] reactions skipped for ${channelId}:`, { error: err.message });
       }
     }
   }
@@ -403,7 +415,7 @@ export class SlackConnector extends DataConnector {
     if (window) {
       params.ts_from = String(Math.floor(window.since.getTime() / 1000));
       params.ts_to = String(Math.floor(window.until.getTime() / 1000));
-      console.log(`[slack] incremental files created from ${window.since.toISOString()} until ${window.until.toISOString()}`);
+      logger.info(`[slack] incremental files created from ${window.since.toISOString()} until ${window.until.toISOString()}`);
     }
     try {
       for await (const file of this.client.paginate("files.list", "files", params)) {
@@ -427,7 +439,7 @@ export class SlackConnector extends DataConnector {
         );
       }
     } catch (err) {
-      console.warn("[slack] files.list skipped:", err.message);
+      logger.warn("[slack] files.list skipped:", { error: err.message });
     }
   }
 

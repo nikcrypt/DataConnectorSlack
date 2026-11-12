@@ -2,6 +2,12 @@
  * Jira Cloud REST client.
  * Auth: Basic (email + API token) — standard Atlassian Cloud POC pattern.
  */
+import loggerFactory from "../../logger.js";
+
+const logger = loggerFactory.component("Jira", {
+  connector: "Jira"
+});
+
 export class JiraClient {
   /**
    * @param {{
@@ -66,6 +72,12 @@ export class JiraClient {
       if (response.status === 429 || response.status === 503) {
         const retryAfter = Number(response.headers.get("Retry-After") || 2);
         attempt += 1;
+        logger.warn("RateLimitHit", {
+          endpoint: pathOrUrl,
+          status: response.status,
+          retryAfter,
+          attempt
+        });
         if (attempt > 5) {
           throw new Error(`Jira rate limited on ${pathOrUrl}`);
         }
@@ -131,6 +143,9 @@ export class JiraClient {
 
   async testConnection() {
     const me = await this.request("/rest/api/3/myself");
+    logger.info("ConnectionTestSucceeded", {
+      accountId: me.accountId
+    });
     return {
       ok: true,
       accountId: me.accountId,

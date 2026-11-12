@@ -1,3 +1,9 @@
+import loggerFactory from "../../logger.js";
+
+const logger = loggerFactory.component("Slack", {
+  connector: "Slack"
+});
+
 const SLACK_API = "https://slack.com/api";
 
 /** Hint which bot scopes are typically required per method. */
@@ -60,6 +66,13 @@ export class SlackClient {
       if (response.status === 429) {
         const retryAfter = Number(response.headers.get("Retry-After") || 1);
         attempt += 1;
+        logger.warn("RateLimitHit", {
+          method,
+          status: 429,
+          retryAfter,
+          attempt,
+          token: this.label
+        });
         if (attempt > this.maxRetries) {
           throw new Error(`Slack rate limited on ${method} after ${this.maxRetries} retries`);
         }
@@ -73,6 +86,13 @@ export class SlackClient {
         if (data.error === "ratelimited") {
           const retryAfter = Number(response.headers.get("Retry-After") || 1);
           attempt += 1;
+          logger.warn("RateLimitHit", {
+            method,
+            status: 429,
+            retryAfter,
+            attempt,
+            token: this.label
+          });
           if (attempt > this.maxRetries) {
             throw new Error(`Slack rate limited on ${method} after ${this.maxRetries} retries`);
           }
@@ -161,9 +181,7 @@ export class SlackDualClient {
       return await this.bot.call(method, params);
     } catch (err) {
       if (this.shouldFallback(err)) {
-        console.warn(
-          `[slack] ${method}: bot ${err.code}; retrying with user token`
-        );
+        logger.warn(`[slack] ${method}: bot ${err.code}; retrying with user token`);
         return this.user.call(method, params);
       }
       if (err.code === "missing_scope") {
@@ -196,9 +214,7 @@ export class SlackDualClient {
         });
       } catch (err) {
         if (this.shouldFallback(err) && !switched) {
-          console.warn(
-            `[slack] ${method}: bot ${err.code}; continuing with user token`
-          );
+          logger.warn(`[slack] ${method}: bot ${err.code}; continuing with user token`);
           client = this.user;
           switched = true;
           page = await client.call(method, {

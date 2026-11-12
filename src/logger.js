@@ -1,9 +1,9 @@
-import path from "node:path";
 import winston from "winston";
 import "winston-daily-rotate-file";
 import "winston-mongodb";
 
 const logDir = process.env.LOG_DIR || "data/logs";
+const mongoLogsUrl = process.env.MONGO_LOGS_URL;
 
 const commonFormat = winston.format.combine(
   winston.format.timestamp(),
@@ -11,53 +11,52 @@ const commonFormat = winston.format.combine(
   winston.format.json()
 );
 
-const appTransport = new winston.transports.DailyRotateFile({
-  dirname: logDir,
-  filename: "data-connector-%DATE%.log",
-  datePattern: "YYYY-MM-DD",
-  maxFiles: "7d",
-  level: "info"
-});
+const transports = [
+  new winston.transports.DailyRotateFile({
+    dirname: logDir,
+    filename: "data-connector-%DATE%.log",
+    datePattern: "YYYY-MM-DD",
+    maxFiles: "7d",
+    level: "info"
+  }),
+  new winston.transports.DailyRotateFile({
+    dirname: logDir,
+    filename: "error-%DATE%.log",
+    datePattern: "YYYY-MM-DD",
+    maxFiles: "7d",
+    level: "error"
+  }),
+];
 
-const errorTransport = new winston.transports.DailyRotateFile({
-  dirname: logDir,
-  filename: "error-%DATE%.log",
-  datePattern: "YYYY-MM-DD",
-  maxFiles: "7d",
-  level: "error"
-});
-
-const mongoAppTransport = new winston.transports.MongoDB({
-  db: process.env.MONGO_LOGS_URL,
-  collection: "application_logs",
-  level: "info",
-  tryReconnect: true,
-  options: {
-    maxPoolSize: 10
-  },
-  metaKey: "metadata"
-});
-
-const mongoErrorTransport = new winston.transports.MongoDB({
-  db: process.env.MONGO_LOGS_URL,
-  collection: "error_logs",
-  level: "error",
-  tryReconnect: true,
-  options: {
-    maxPoolSize: 10
-  },
-  metaKey: "metadata"
-});
+if (mongoLogsUrl) {
+  transports.push(
+    new winston.transports.MongoDB({
+      db: mongoLogsUrl,
+      collection: "application_logs",
+      level: "info",
+      tryReconnect: true,
+      options: {
+        maxPoolSize: 10
+      },
+      metaKey: "metadata"
+    }),
+    new winston.transports.MongoDB({
+      db: mongoLogsUrl,
+      collection: "error_logs",
+      level: "error",
+      tryReconnect: true,
+      options: {
+        maxPoolSize: 10
+      },
+      metaKey: "metadata"
+    })
+  );
+}
 
 const rootLogger = winston.createLogger({
   level: process.env.LOG_LEVEL || "info",
   format: commonFormat,
-  transports: [
-  appTransport,
-  errorTransport,
-  mongoAppTransport,
-  mongoErrorTransport
-]
+  transports
 });
 
 if (process.env.NODE_ENV !== "production") {
@@ -69,6 +68,9 @@ if (process.env.NODE_ENV !== "production") {
       )
     })
   );
+} else {
+  // Keep stdout in production for Docker/K8s log collectors.
+  rootLogger.add(new winston.transports.Console({ format: commonFormat }));
 }
 
 class ConnectorLogger {

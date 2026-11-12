@@ -3,6 +3,11 @@ import { readFileSync } from "node:fs";
 import { DataConnector } from "../base/DataConnector.js";
 import { JiraClient } from "./JiraClient.js";
 import { incrementalWindow } from "../base/incrementalWindow.js";
+import loggerFactory from "../../logger.js";
+
+const logger = loggerFactory.component("Jira", {
+  connector: "Jira"
+});
 const CONFIG_PATH = new URL("../../config/connectors/jira.json", import.meta.url);
 const SUPPORTED_OBJECTS = ["projects", "issues", "users", "statuses", "issueTypes"];
 const BOOLEAN_FIELDS = new Set(["isPrivate", "active", "subtask"]);
@@ -324,6 +329,10 @@ export class JiraConnector extends DataConnector {
   }
 
   async *extract(object, options = {}) {
+    logger.info("ExtractionStarted", {
+      object,
+      incremental: Boolean(options.checkpoint)
+    });
     if (this.customJql !== null && object !== "issues") {
       throw new Error("Custom JQL can only be used when extracting Jira issues");
     }
@@ -351,6 +360,9 @@ export class JiraConnector extends DataConnector {
       default:
         throw new Error(`Extract not implemented for ${object}`);
     }
+    logger.info("ExtractionCompleted", {
+      object
+    });
   }
 
   async *readProjects(options = {}) {
@@ -414,10 +426,10 @@ export class JiraConnector extends DataConnector {
     const { jql, window } = this.getIssueExtractionQuery(options);
     const projectKey = this.customJql === null ? this.projectKey : this.preparedJql.projectKey;
     if (projectKey) {
-      console.log(`[jira] extracting issues for project ${projectKey}`);
+      logger.info(`[jira] extracting issues for project ${projectKey}`);
     }
     if (window) {
-      console.log(`[jira] incremental issues updated from ${window.since.toISOString()} until ${window.until.toISOString()}`);
+      logger.info(`[jira] incremental issues updated from ${window.since.toISOString()} until ${window.until.toISOString()}`);
     }
     yield* this.extractIssuesForQuery(definition, jql);
   }
@@ -454,7 +466,7 @@ export class JiraConnector extends DataConnector {
         extracted: 0,
       };
       execution.projects.push(result);
-      console.log(`[jira] extracting issues for project ${project.key} (${projectMode})`);
+      logger.info(`[jira] extracting issues for project ${project.key} (${projectMode})`);
       try {
         for await (const record of this.extractIssuesForQuery(definition, jql)) {
           result.extracted += 1;
@@ -464,6 +476,7 @@ export class JiraConnector extends DataConnector {
       } catch (error) {
         result.status = "failed";
         result.error = error.message;
+        logger.trackError(error, { object: "issues", projectKey: project.key });
         throw new Error(`Jira issues for project ${project.key} failed: ${error.message}`, { cause: error });
       } finally {
         if (result.status === "running") result.status = "interrupted";
@@ -477,9 +490,9 @@ export class JiraConnector extends DataConnector {
       throw new Error("Jira returned no projects previously covered by the checkpoint; verify source access before retrying");
     }
     if (execution.missingProjects.length) {
-      console.warn(`[jira] ${execution.missingProjects.length} previously covered projects are no longer visible; stored issues were not marked deleted`);
+      logger.warn(`[jira] ${execution.missingProjects.length} previously covered projects are no longer visible; stored issues were not marked deleted`);
     }
-    if (execution.projects.length === 0) console.log("[jira] no accessible projects found");
+    if (execution.projects.length === 0) logger.info("[jira] no accessible projects found");
     execution.complete = true;
   }
 
@@ -519,7 +532,7 @@ export class JiraConnector extends DataConnector {
         });
         users = Array.isArray(page) ? page : page.values || [];
       } catch (err) {
-        console.warn("[jira] users extract skipped:", err.message);
+        logger.warn("[jira] users extract skipped:", { error: err.message });
         return;
       }
 

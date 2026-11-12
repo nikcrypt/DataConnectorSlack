@@ -88,7 +88,9 @@
     "mssql": "^11.0.2",
     "mysql2": "^3.24.5",
     "oracledb": "^6.10.0",
-    "pg": "^8.13.1"
+    "pg": "^8.13.1",
+    "winston": "^3.19.0",
+    "winston-daily-rotate-file": "^5.0.0",
+    "winston-mongodb": "^7.0.1"
   }
 }
-
