@@ -1,14 +1,86 @@
 {
   "connector": "jira",
-  "objects": [
-    "projects",
-    "issues",
-    "users",
-    "statuses",
-    "issueTypes"
-  ],
+  "objects": {
+    "projects": {
+      "enabled": true,
+      "endpoint": "/rest/api/3/project/search",
+      "pageSize": 50,
+      "fields": {
+        "id": "id",
+        "key": "key",
+        "name": "name",
+        "projectTypeKey": "projectTypeKey",
+        "style": "style",
+        "isPrivate": "isPrivate",
+        "lead.accountId": "leadAccountId",
+        "lead.displayName": "leadDisplayName"
+      }
+    },
+    "issues": {
+      "enabled": true,
+      "endpoint": "/rest/api/3/search/jql",
+      "pageSize": 50,
+      "fields": {
+        "id": "id",
+        "key": "key",
+        "fields.summary": "summary",
+        "fields.status.name": "status",
+        "fields.status.statusCategory.name": "statusCategory",
+        "fields.issuetype.name": "issueType",
+        "fields.project.key": "projectKey",
+        "fields.project.name": "projectName",
+        "fields.priority.name": "priority",
+        "fields.assignee.accountId": "assigneeAccountId",
+        "fields.assignee.displayName": "assigneeName",
+        "fields.reporter.accountId": "reporterAccountId",
+        "fields.reporter.displayName": "reporterName",
+        "fields.labels": "labels",
+        "fields.created": "created",
+        "fields.updated": "updated",
+        "fields.description": "description"
+      }
+    },
+    "users": {
+      "enabled": true,
+      "endpoint": "/rest/api/3/users/search",
+      "pageSize": 50,
+      "fields": {
+        "accountId": "accountId",
+        "displayName": "displayName",
+        "emailAddress": "emailAddress",
+        "active": "active",
+        "accountType": "accountType",
+        "timeZone": "timeZone"
+      }
+    },
+    "statuses": {
+      "enabled": true,
+      "endpoint": "/rest/api/3/status",
+      "fields": {
+        "id": "id",
+        "name": "name",
+        "description": "description",
+        "statusCategory.name": "statusCategory"
+      }
+    },
+    "issueTypes": {
+      "enabled": true,
+      "endpoint": "/rest/api/3/issuetype",
+      "fields": {
+        "id": "id",
+        "name": "name",
+        "description": "description",
+        "subtask": "subtask",
+        "hierarchyLevel": "hierarchyLevel"
+      }
+    }
+  },
   "options": {
     "defaultJql": "ORDER BY updated DESC",
-    "maxIssues": 500
+    "jqlValidationEndpoint": "/rest/api/3/jql/parse",
+    "projectKey": null,
+    "incremental": {
+      "lookbackMinutes": 0
+    }
   }
 }

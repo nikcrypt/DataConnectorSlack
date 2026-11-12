@@ -1,9 +1,14 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
+import {
+  checkpointAfterSuccess,
+  checkpointScope,
+  hasUsableCheckpoint,
+  requiresCheckpoint,
+} from "./checkpoint.js";
 
 /**
  * Minimal runtime: extract pages from a connector and write JSONL output.
- * Later this can swap to MongoDB upsert + hash change detection.
  */
 export class ConnectorRuntimeEngine {
   /**
@@ -35,14 +40,17 @@ export class ConnectorRuntimeEngine {
     await mkdir(connectorOutputDir, { recursive: true });
     await mkdir(checkpointDir, { recursive: true });
 
-    if (mode === "incremental") {
-      const objectCheckpoints = checkpoint
+    const objectCheckpoints = mode === "incremental"
+      ? checkpoint
         ? { ...checkpoint }
-        : await this.loadCheckpoints(checkpointDir, selected);
+        : await this.loadCheckpoints(checkpointDir, selected)
+      : {};
+    if (mode === "incremental") {
       for (const object of selected) {
-        const checkpointRequired = this.connector.getCheckpoint?.(object) !== null
-          && this.connector.getCheckpoint?.(object) !== undefined;
-        if (checkpointRequired && !objectCheckpoints[object]?.lastSuccessfulAt) {
+        if (
+          requiresCheckpoint(this.connector, object)
+          && !hasUsableCheckpoint(this.connector, object, objectCheckpoints[object])
+        ) {
           throw new Error(
             `Incremental extraction requires a previous successful run checkpoint for ${object}.`
           );
@@ -50,17 +58,21 @@ export class ConnectorRuntimeEngine {
       }
     }
 
-    const checkpoints = {};
     for (const object of selected) {
       const counts = { extracted: 0 };
-      const outPath = path.join(connectorOutputDir, `${object}.jsonl`);
-      const lines = [];
+      const scope = checkpointScope(this.connector, object);
+      if (scope) counts.scope = scope;
+      const outPath = path.join(
+        connectorOutputDir,
+        scopedFileName(object, scope, ".jsonl"),
+      );
       const objectCheckpoint = mode === "incremental"
-        ? checkpoint?.[object] || await this.loadCheckpoint(checkpointDir, object)
+        ? objectCheckpoints[object]
         : null;
 
       if (!this.quiet) console.log(`[runtime] extracting ${object}...`);
 
+      const lines = [];
       for await (const record of this.connector.extract(object, {
         mode,
         checkpoint: objectCheckpoint,
@@ -80,16 +92,19 @@ export class ConnectorRuntimeEngine {
       }
     }
 
-    if (mode === "incremental" || mode === "full") {
-      for (const object of selected) {
-        if (this.connector.getCheckpoint?.(object) === null) continue;
-        checkpoints[object] = { lastSuccessfulAt: startedAtIso };
-        await writeFile(
-          path.join(checkpointDir, `${object}.json`),
-          JSON.stringify(checkpoints[object], null, 2),
-          "utf8"
-        );
-      }
+    for (const object of selected) {
+      const nextCheckpoint = checkpointAfterSuccess(
+        this.connector,
+        object,
+        startedAtIso,
+      );
+      if (!nextCheckpoint) continue;
+      const scope = checkpointScope(this.connector, object);
+      await writeFile(
+        path.join(checkpointDir, scopedFileName(object, scope, ".json")),
+        JSON.stringify(nextCheckpoint, null, 2),
+        "utf8"
+      );
     }
 
     summary.finishedAt = new Date().toISOString();
@@ -101,7 +116,9 @@ export class ConnectorRuntimeEngine {
 
   async loadCheckpoint(checkpointDir, object) {
     try {
-      return JSON.parse(await readFile(path.join(checkpointDir, `${object}.json`), "utf8"));
+      const scope = checkpointScope(this.connector, object);
+      const fileName = scopedFileName(object, scope, ".json");
+      return JSON.parse(await readFile(path.join(checkpointDir, fileName), "utf8"));
     } catch (err) {
       if (err.code === "ENOENT") return null;
       throw err;
@@ -115,4 +132,9 @@ export class ConnectorRuntimeEngine {
     }
     return checkpoints;
   }
+}
+
+function scopedFileName(object, scope, extension) {
+  const suffix = scope ? `-${encodeURIComponent(scope)}` : "";
+  return `${object}${suffix}${extension}`;
 }

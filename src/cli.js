@@ -23,6 +23,8 @@ function parseArgs(argv) {
     connector: "slack",
     objects: null,
     mode: "full",
+    projectKey: null,
+    jql: null,
   };
 
   for (let i = 3; i < argv.length; i += 1) {
@@ -35,10 +37,36 @@ function parseArgs(argv) {
     } else if (argv[i] === "--mode" && argv[i + 1]) {
       args.mode = argv[i + 1].trim().toLowerCase();
       i += 1;
+    } else if (argv[i] === "--project-key" && argv[i + 1]) {
+      args.projectKey = argv[i + 1].trim();
+      i += 1;
+    } else if (argv[i] === "--jql" && argv[i + 1]) {
+      args.jql = argv[i + 1].trim();
+      if (!args.jql) {
+        throw new Error("--jql requires a non-empty query");
+      }
+      i += 1;
     }
   }
 
   return args;
+}
+
+function validateJqlOptions(args, objects = args.objects) {
+  if (args.jql === null) return;
+
+  if (args.connector !== "jira") {
+    throw new Error("--jql can only be used with the Jira connector");
+  }
+  if (args.command !== "extract" && args.command !== "extract-mongo") {
+    throw new Error("--jql is supported only for extract and extract-mongo");
+  }
+  if (args.mode !== "full" && args.mode !== "incremental") {
+    throw new Error("Jira extraction mode must be full or incremental");
+  }
+  if (objects && (objects.length !== 1 || objects[0] !== "issues")) {
+    throw new Error("--jql requires issues to be the only selected Jira object");
+  }
 }
 
 async function loadSlackConfig() {
@@ -67,7 +95,7 @@ async function loadSlackConfig() {
   return { botToken, userToken, historyDays, channelIds, team: auth?.team || null };
 }
 
-function createConnector(name) {
+function createConnector(name, options = {}) {
   switch (name) {
     case "slack":
       return loadSlackConfig().then((config) => new SlackConnector(config));
@@ -83,7 +111,10 @@ function createConnector(name) {
     case "salesforce":
       return Promise.resolve(SalesforceConnector.fromEnv());
     case "jira":
-      return Promise.resolve(JiraConnector.fromEnv());
+      return Promise.resolve(JiraConnector.fromEnv({
+        projectKey: options.projectKey,
+        jql: options.jql,
+      }));
     case "googledrive":
     case "google-drive":
     case "gdrive":
@@ -114,6 +145,11 @@ function createConnector(name) {
 
 async function main() {
   const args = parseArgs(process.argv);
+  validateJqlOptions(args);
+
+  if (args.projectKey && args.connector !== "jira") {
+    throw new Error("--project-key can only be used with the Jira connector");
+  }
 
   if (args.command === "help" || args.command === "--help") {
     printHelp();
@@ -164,7 +200,19 @@ async function main() {
   const session = await requireCliAuth();
   console.log(`[cli] session ok (${session.user})`);
 
-  const connector = await createConnector(args.connector);
+  const connector = await createConnector(args.connector, {
+    projectKey: args.projectKey,
+    jql: args.jql,
+  });
+
+  if (args.jql !== null) {
+    validateJqlOptions(args, args.objects || connector.getObjects());
+    const prepared = await connector.prepareCustomJql();
+    connector.validateExtractionMode(args.mode);
+    if (prepared?.checkpointPolicy === "skip") {
+      console.log(`[jira] checkpoint skipped: ${prepared.checkpointReason}`);
+    }
+  }
 
   if (args.command === "test") {
     const result = await connector.testConnection();
@@ -293,8 +341,12 @@ Jira Cloud:
   JIRA_BASE_URL=https://your-domain.atlassian.net
   JIRA_EMAIL=you@company.com
   JIRA_API_TOKEN=...
-  Optional: JIRA_JQL=updated >= -365d ORDER BY updated DESC
-  Optional: JIRA_MAX_ISSUES=500
+  Config: src/config/connectors/jira.json (defaultJql, projectKey, endpoints)
+  Optional: JIRA_PROJECT_KEY=DCS
+  Custom JQL (issues only):
+    npm run extract:jira -- --objects issues --jql 'issuetype = Bug ORDER BY updated DESC'
+    npm run extract:jira:mongo -- --objects issues --project-key DCS --jql 'status = "In Progress"'
+  --jql and --project-key are Jira-only; do not put project in both
 
 Google Drive:
   GOOGLE_SERVICE_ACCOUNT_FILE=./certs/google-sa.json

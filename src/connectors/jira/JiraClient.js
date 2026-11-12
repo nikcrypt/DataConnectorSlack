@@ -2,7 +2,6 @@
  * Jira Cloud REST client.
  * Auth: Basic (email + API token) — standard Atlassian Cloud POC pattern.
  */
-
 export class JiraClient {
   /**
    * @param {{
@@ -34,7 +33,7 @@ export class JiraClient {
 
   /**
    * @param {string} pathOrUrl
-   * @param {{ query?: Record<string, string|number|boolean|undefined>, method?: string, body?: object }} [options]
+   * @param {{ query?: Record<string, string|number|boolean|undefined>, method?: string, body?: object, timeoutMs?: number }} [options]
    */
   async request(pathOrUrl, options = {}) {
     let url = pathOrUrl.startsWith("http")
@@ -61,6 +60,7 @@ export class JiraClient {
           "Content-Type": "application/json",
         },
         body: options.body ? JSON.stringify(options.body) : undefined,
+        signal: options.timeoutMs ? AbortSignal.timeout(options.timeoutMs) : undefined,
       });
 
       if (response.status === 429 || response.status === 503) {
@@ -94,6 +94,41 @@ export class JiraClient {
     }
   }
 
+  async parseJql(endpoint, jql) {
+    let data;
+    try {
+      data = await this.request(endpoint, {
+        method: "POST",
+        query: { validation: "strict" },
+        body: { queries: [jql] },
+        timeoutMs: 30_000,
+      });
+    } catch (error) {
+      throw new Error(`Jira JQL validation failed: ${error.message}`, { cause: error });
+    }
+
+    if (!Array.isArray(data?.queries) || data.queries.length !== 1) {
+      throw new Error("Jira JQL validation returned an unexpected response");
+    }
+    const result = data.queries[0];
+    for (const key of ["errors", "warnings"]) {
+      const messages = result?.[key];
+      if (messages !== undefined) {
+        if (!Array.isArray(messages) || messages.some((message) => typeof message !== "string")) {
+          throw new Error("Jira JQL validation returned an unexpected response");
+        }
+        if (messages.length) {
+          throw new Error(`JQL validation ${key}: ${messages.join("; ")}`);
+        }
+      }
+    }
+    if (!result?.structure || typeof result.structure !== "object" || Array.isArray(result.structure)
+      || (!result.structure.where && !result.structure.orderBy)) {
+      throw new Error("Jira JQL validation did not return a parsed query structure");
+    }
+    return result.structure;
+  }
+
   async testConnection() {
     const me = await this.request("/rest/api/3/myself");
     return {
@@ -120,28 +155,52 @@ export class JiraClient {
         query: { ...query, startAt, maxResults: pageSize },
       });
 
-      const items = page[listKey] || [];
+      if (!page || !Array.isArray(page[listKey])) {
+        throw new Error(`Jira ${path} page at startAt ${startAt} does not contain a ${listKey} array`);
+      }
+      if (page.startAt !== undefined && page.startAt !== startAt) {
+        throw new Error(`Jira ${path} pagination did not advance to startAt ${startAt}`);
+      }
+      if (page.isLast !== undefined && typeof page.isLast !== "boolean") {
+        throw new Error(`Jira ${path} page at startAt ${startAt} has an invalid isLast value`);
+      }
+      const total = page.total;
+      if (total !== undefined && (!Number.isSafeInteger(total) || total < 0)) {
+        throw new Error(`Jira ${path} page at startAt ${startAt} has an invalid total`);
+      }
+      const items = page[listKey];
+      const nextStartAt = startAt + items.length;
+      if ((!items.length && page.isLast === false)
+        || (typeof total === "number" && nextStartAt < total
+          && (!items.length || page.isLast === true))) {
+        throw new Error(`Jira ${path} pagination stopped before all projects were returned`);
+      }
       for (const item of items) {
         yield item;
       }
 
-      const total = page.total;
-      startAt += items.length;
-
-      if (!items.length) break;
-      if (typeof total === "number" && startAt >= total) break;
-      if (items.length < pageSize) break;
+      startAt = nextStartAt;
+      if (page.isLast === true) return;
+      if (page.isLast === false) continue;
+      if (typeof total === "number") {
+        if (startAt >= total) return;
+        continue;
+      }
+      if (!items.length) return;
     }
   }
 
   /**
-   * Issue search with JQL via /rest/api/3/search/jql (token pagination).
+   * Issue search with JQL using the configured token-pagination endpoint.
    * Legacy /rest/api/3/search was removed (CHANGE-2046).
+   * @param {string} path
    * @param {string} jql
    * @param {string[]} [fields]
    * @param {number} [pageSize]
+   * @param {{ method?: "GET" | "POST" }} [options]
    */
   async *searchIssues(
+    path,
     jql,
     fields = [
       "summary",
@@ -156,27 +215,49 @@ export class JiraClient {
       "labels",
       "description",
     ],
-    pageSize = 50
+    pageSize = 50,
+    options = {}
   ) {
+    const method = options.method || "GET";
+    if (method !== "GET" && method !== "POST") {
+      throw new Error("Jira issue search supports GET or POST");
+    }
     let nextPageToken;
+    let pageNumber = 1;
 
     while (true) {
-      const page = await this.request("/rest/api/3/search/jql", {
-        query: {
-          jql,
-          maxResults: pageSize,
-          fields: fields.join(","),
-          nextPageToken,
-        },
-      });
+      const parameters = { jql, maxResults: pageSize, nextPageToken };
+      const page = await this.request(path, method === "POST"
+        ? { method, body: { ...parameters, fields } }
+        : { query: { ...parameters, fields: fields.join(",") } });
 
-      const issues = page.issues || [];
+      if (!page || !Array.isArray(page.issues)) {
+        throw new Error(
+          `Jira issue search page ${pageNumber} does not contain an issues array`
+        );
+      }
+
+      const issues = page.issues;
+      const isLastPage = page.isLast === true;
+      const newPageToken = page.nextPageToken;
+
+      if (!isLastPage && !newPageToken) {
+        throw new Error(
+          `Jira issue search page ${pageNumber} did not provide a next page token`
+        );
+      }
+      if (!isLastPage && newPageToken === nextPageToken) {
+        throw new Error(`Jira issue pagination did not advance after page ${pageNumber}`);
+      }
+
       for (const issue of issues) {
         yield issue;
       }
 
-      nextPageToken = page.nextPageToken;
-      if (!nextPageToken || !issues.length || page.isLast === true) break;
+      if (isLastPage) return;
+
+      nextPageToken = newPageToken;
+      pageNumber += 1;
     }
   }
 }

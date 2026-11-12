@@ -1,5 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { MongoClient } from "mongodb";
+import {
+  checkpointAfterSuccess,
+  checkpointScope,
+  hasUsableCheckpoint,
+  requiresCheckpoint,
+} from "./checkpoint.js";
 
 const DEFAULT_BATCH_SIZE = 200;
 
@@ -66,11 +72,14 @@ export class MongoRuntime {
       const objectCheckpoints = mode === "incremental"
         ? checkpoint
           ? { ...checkpoint }
-          : await loadCheckpoints(checkpoints, this.connectorKey, selected)
+          : await loadCheckpoints(checkpoints, this.connector, this.connectorKey, selected)
         : {};
       if (mode === "incremental") {
         for (const object of selected) {
-          if (requiresCheckpoint(this.connector, object) && !objectCheckpoints[object]?.lastSuccessfulAt) {
+          if (
+            requiresCheckpoint(this.connector, object)
+            && !hasUsableCheckpoint(this.connector, object, objectCheckpoints[object])
+          ) {
             throw new Error(
               `Incremental extraction requires a previous successful run checkpoint for ${object}.`
             );
@@ -110,14 +119,21 @@ export class MongoRuntime {
           }
         );
         for (const object of selected) {
-          if (!requiresCheckpoint(this.connector, object)) continue;
+          const nextCheckpoint = checkpointAfterSuccess(
+            this.connector,
+            object,
+            startedAtIso,
+          );
+          if (!nextCheckpoint) continue;
+          const scope = checkpointScope(this.connector, object);
           await checkpoints.updateOne(
-            { connectorKey: this.connectorKey, object },
+            { connectorKey: this.connectorKey, object, scope },
             {
               $set: {
                 connectorKey: this.connectorKey,
                 object,
-                lastSuccessfulAt: startedAtIso,
+                scope,
+                ...nextCheckpoint,
                 runId,
               },
             },
@@ -218,13 +234,19 @@ async function flushBatch(records, batch) {
   return { upserted: result.upsertedCount || 0, modified: result.modifiedCount || 0 };
 }
 
-async function loadCheckpoints(checkpoints, connectorKey, objects) {
+async function loadCheckpoints(checkpoints, connector, connectorKey, objects) {
   const result = {};
   for (const object of objects) {
-    const checkpoint = await checkpoints.findOne({ connectorKey, object });
-    if (checkpoint) result[object] = {
-      lastSuccessfulAt: checkpoint.lastSuccessfulAt,
-    };
+    const scope = checkpointScope(connector, object);
+    const checkpoint = await checkpoints.findOne({ connectorKey, object, scope });
+    if (checkpoint) {
+      result[object] = {
+        checkpointType: checkpoint.checkpointType,
+        lastSuccessfulAt: checkpoint.lastSuccessfulAt,
+        cursor: checkpoint.cursor,
+        state: checkpoint.state,
+      };
+    }
   }
   return result;
 }
@@ -245,11 +267,6 @@ function databaseNameFromUri(uri) {
   const parsed = new URL(uri.replace(/^mongodb(\+srv)?:/, "https:"));
   const name = decodeURIComponent(parsed.pathname.replace(/^\//, ""));
   return name || "data_connector_db";
-}
-
-function requiresCheckpoint(connector, object) {
-  const checkpoint = connector.getCheckpoint?.(object);
-  return checkpoint !== null && checkpoint !== undefined;
 }
 
 function safeError(err) {
