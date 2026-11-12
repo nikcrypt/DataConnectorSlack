@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { DataConnector } from "../base/DataConnector.js";
 import { incrementalWindow } from "../base/incrementalWindow.js";
+import { resolveTableDataTargets } from "../base/resolveTableDataTargets.js";
 import { MysqlClient } from "./MysqlClient.js";
 
 const METADATA_OBJECTS = ["schemas", "tables", "views", "columns"];
@@ -44,6 +45,7 @@ export class MysqlConnector extends DataConnector {
    *   pageSize?: number,
    *   schemaName?: string|null,
    *   tableName?: string|null,
+   *   tablesSpec?: string|null,
    *   modifiedColumn?: string|null,
    * }} config
    */
@@ -56,6 +58,7 @@ export class MysqlConnector extends DataConnector {
       : 1000;
     this.schemaName = config.schemaName || null;
     this.tableName = config.tableName || null;
+    this.tablesSpec = config.tablesSpec || null;
     this.modifiedColumn = config.modifiedColumn || null;
   }
 
@@ -71,6 +74,7 @@ export class MysqlConnector extends DataConnector {
       pageSize: Number.isFinite(pageSize) && pageSize > 0 ? pageSize : 1000,
       schemaName: process.env.MYSQL_SCHEMA?.trim() || null,
       tableName: process.env.MYSQL_TABLE?.trim() || null,
+      tablesSpec: process.env.MYSQL_TABLES?.trim() || null,
       modifiedColumn: process.env.MYSQL_MODIFIED_COLUMN?.trim() || null,
     });
   }
@@ -269,34 +273,21 @@ export class MysqlConnector extends DataConnector {
 
   /**
    * Read actual table rows (paginated).
-   * Requires MYSQL_SCHEMA + MYSQL_TABLE so extracts do not scan the whole DB.
+   * Configure MYSQL_SCHEMA + MYSQL_TABLE, or MYSQL_TABLES (comma-separated).
    */
   async *extractTableData(options = {}) {
-    if (!this.schemaName || !this.tableName) {
-      throw new Error(
-        "MySQL table_data requires MYSQL_SCHEMA and MYSQL_TABLE in .env " +
-          "(example: MYSQL_SCHEMA=appdb, MYSQL_TABLE=orders)."
-      );
-    }
-
-    const filter = this.client.schemaFilter(this.allowedSchemas, "TABLE_SCHEMA");
-    const params = [...filter.params, this.schemaName, this.tableName];
-
-    const tables = await this.client.query(
-      `
-      SELECT TABLE_SCHEMA AS table_schema, TABLE_NAME AS table_name
-      FROM information_schema.TABLES
-      WHERE TABLE_TYPE = 'BASE TABLE' ${filter.clause}
-        AND TABLE_SCHEMA = ?
-        AND TABLE_NAME = ?
-      ORDER BY TABLE_SCHEMA, TABLE_NAME
-      `,
-      params
-    );
-
+    const targets = resolveTableDataTargets({
+      schema: this.schemaName,
+      table: this.tableName,
+      tables: this.tablesSpec,
+      envPrefix: "MYSQL",
+    });
+    const tables = await this.resolveMysqlTables(targets);
     if (!tables.length) {
       throw new Error(
-        `MySQL table not found or not visible: ${this.schemaName}.${this.tableName}`
+        `MySQL table_data: none of the configured tables were found or visible (${targets
+          .map((t) => `${t.schemaName}.${t.tableName}`)
+          .join(", ")})`
       );
     }
 
@@ -383,6 +374,31 @@ export class MysqlConnector extends DataConnector {
         `[mysql] table_data ${schemaName}.${tableName} done (${extractedRows} rows, ${pageNumber} pages)`
       );
     }
+  }
+
+  async resolveMysqlTables(targets) {
+    const filter = this.client.schemaFilter(this.allowedSchemas, "TABLE_SCHEMA");
+    const found = [];
+    for (const target of targets) {
+      const rows = await this.client.query(
+        `
+        SELECT TABLE_SCHEMA AS table_schema, TABLE_NAME AS table_name
+        FROM information_schema.TABLES
+        WHERE TABLE_TYPE = 'BASE TABLE' ${filter.clause}
+          AND TABLE_SCHEMA = ?
+          AND TABLE_NAME = ?
+        `,
+        [...filter.params, target.schemaName, target.tableName]
+      );
+      if (!rows.length) {
+        console.log(
+          `[mysql] table_data skipped missing table ${target.schemaName}.${target.tableName}`
+        );
+        continue;
+      }
+      found.push(rows[0]);
+    }
+    return found;
   }
 
   async *extractChangedRows(schemaName, tableName, window) {

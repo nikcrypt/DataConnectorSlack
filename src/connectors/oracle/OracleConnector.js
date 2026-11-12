@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { DataConnector } from "../base/DataConnector.js";
 import { incrementalWindow } from "../base/incrementalWindow.js";
+import { resolveTableDataTargets } from "../base/resolveTableDataTargets.js";
 import { OracleClient } from "./OracleClient.js";
 
 const METADATA_OBJECTS = ["schemas", "tables", "views", "columns"];
@@ -33,6 +34,7 @@ export class OracleConnector extends DataConnector {
    *   pageSize?: number,
    *   schemaName?: string|null,
    *   tableName?: string|null,
+   *   tablesSpec?: string|null,
    *   modifiedColumn?: string|null,
    * }} config
    */
@@ -45,6 +47,7 @@ export class OracleConnector extends DataConnector {
       : 1000;
     this.schemaName = config.schemaName || null;
     this.tableName = config.tableName || null;
+    this.tablesSpec = config.tablesSpec || null;
     this.modifiedColumn = config.modifiedColumn || null;
   }
 
@@ -60,6 +63,7 @@ export class OracleConnector extends DataConnector {
       pageSize: Number.isFinite(pageSize) && pageSize > 0 ? pageSize : 1000,
       schemaName: process.env.ORACLE_SCHEMA?.trim() || null,
       tableName: process.env.ORACLE_TABLE?.trim() || null,
+      tablesSpec: process.env.ORACLE_TABLES?.trim() || null,
       modifiedColumn: process.env.ORACLE_MODIFIED_COLUMN?.trim() || null,
     });
   }
@@ -268,39 +272,24 @@ export class OracleConnector extends DataConnector {
 
   /**
    * Read actual table rows (paginated).
-   * Requires ORACLE_SCHEMA + ORACLE_TABLE so extracts do not scan the whole DB.
+   * Configure ORACLE_SCHEMA + ORACLE_TABLE, or ORACLE_TABLES (comma-separated).
    */
   async *extractTableData(options = {}) {
-    if (!this.schemaName || !this.tableName) {
-      throw new Error(
-        "Oracle table_data requires ORACLE_SCHEMA and ORACLE_TABLE in .env " +
-          "(example: ORACLE_SCHEMA=HR, ORACLE_TABLE=EMPLOYEES)."
-      );
-    }
-
-    const filter = this.client.ownerFilter(this.allowedSchemas, "t.owner");
-    const binds = {
-      ...filter.binds,
-      schema_name: this.schemaName.toUpperCase(),
-      table_name: this.tableName.toUpperCase(),
-    };
-
-    const tables = await this.client.query(
-      `
-      SELECT t.owner AS schema_name, t.table_name
-      FROM all_tables t
-      WHERE 1 = 1
-      ${filter.clause}
-        AND t.owner = :schema_name
-        AND t.table_name = :table_name
-      ORDER BY t.owner, t.table_name
-      `,
-      binds
-    );
-
+    const targets = resolveTableDataTargets({
+      schema: this.schemaName,
+      table: this.tableName,
+      tables: this.tablesSpec,
+      envPrefix: "ORACLE",
+    }).map((target) => ({
+      schemaName: target.schemaName.toUpperCase(),
+      tableName: target.tableName.toUpperCase(),
+    }));
+    const tables = await this.resolveOracleTables(targets);
     if (!tables.length) {
       throw new Error(
-        `Oracle table not found or not visible: ${this.schemaName}.${this.tableName}`
+        `Oracle table_data: none of the configured tables were found or visible (${targets
+          .map((t) => `${t.schemaName}.${t.tableName}`)
+          .join(", ")})`
       );
     }
 
@@ -385,6 +374,36 @@ export class OracleConnector extends DataConnector {
         `[oracle] table_data ${schemaName}.${tableName} done (${extractedRows} rows, ${pageNumber} pages)`
       );
     }
+  }
+
+  async resolveOracleTables(targets) {
+    const filter = this.client.ownerFilter(this.allowedSchemas, "t.owner");
+    const found = [];
+    for (const target of targets) {
+      const rows = await this.client.query(
+        `
+        SELECT t.owner AS schema_name, t.table_name
+        FROM all_tables t
+        WHERE 1 = 1
+        ${filter.clause}
+          AND t.owner = :schema_name
+          AND t.table_name = :table_name
+        `,
+        {
+          ...filter.binds,
+          schema_name: target.schemaName,
+          table_name: target.tableName,
+        }
+      );
+      if (!rows.length) {
+        console.log(
+          `[oracle] table_data skipped missing table ${target.schemaName}.${target.tableName}`
+        );
+        continue;
+      }
+      found.push(rows[0]);
+    }
+    return found;
   }
 
   async *extractChangedRows(schemaName, tableName, window) {

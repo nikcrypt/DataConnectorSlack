@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { DataConnector } from "../base/DataConnector.js";
 import { incrementalWindow } from "../base/incrementalWindow.js";
+import { resolveTableDataTargets } from "../base/resolveTableDataTargets.js";
 import { PostgresClient } from "./PostgresClient.js";
 
 const METADATA_OBJECTS = ["schemas", "tables", "views", "columns"];
@@ -39,6 +40,7 @@ export class PostgresConnector extends DataConnector {
    *   pageSize?: number,
    *   schemaName?: string|null,
    *   tableName?: string|null,
+   *   tablesSpec?: string|null,
    *   modifiedColumn?: string|null,
    * }} config
    */
@@ -51,6 +53,7 @@ export class PostgresConnector extends DataConnector {
       : 1000;
     this.schemaName = config.schemaName || null;
     this.tableName = config.tableName || null;
+    this.tablesSpec = config.tablesSpec || null;
     this.modifiedColumn = config.modifiedColumn || null;
     this.clock = undefined;
   }
@@ -67,6 +70,7 @@ export class PostgresConnector extends DataConnector {
       pageSize: Number.isFinite(pageSize) && pageSize > 0 ? pageSize : 1000,
       schemaName: process.env.POSTGRES_SCHEMA?.trim() || null,
       tableName: process.env.POSTGRES_TABLE?.trim() || null,
+      tablesSpec: process.env.POSTGRES_TABLES?.trim() || null,
       modifiedColumn: process.env.POSTGRES_MODIFIED_COLUMN?.trim() || null,
     });
   }
@@ -321,36 +325,21 @@ export class PostgresConnector extends DataConnector {
 
   /**
    * Read actual table rows (paginated).
-   * Requires POSTGRES_SCHEMA + POSTGRES_TABLE.
+   * Configure POSTGRES_SCHEMA + POSTGRES_TABLE, or POSTGRES_TABLES (comma-separated).
    */
   async *extractTableData(options = {}) {
-    if (!this.schemaName || !this.tableName) {
-      throw new Error(
-        "Postgres table_data requires POSTGRES_SCHEMA and POSTGRES_TABLE in .env " +
-          "(example: POSTGRES_SCHEMA=public, POSTGRES_TABLE=orders)."
-      );
-    }
-
-    const filter = this.client.tableSchemaFilter(this.allowedSchemas);
-    const params = [...filter.params, this.schemaName, this.tableName];
-    const schemaParam = `$${filter.params.length + 1}`;
-    const tableParam = `$${filter.params.length + 2}`;
-
-    const tables = await this.client.query(
-      `
-      SELECT table_schema, table_name
-      FROM information_schema.tables
-      WHERE table_type = 'BASE TABLE' ${filter.clause}
-        AND table_schema = ${schemaParam}
-        AND table_name = ${tableParam}
-      ORDER BY table_schema, table_name
-      `,
-      params
-    );
-
+    const targets = resolveTableDataTargets({
+      schema: this.schemaName,
+      table: this.tableName,
+      tables: this.tablesSpec,
+      envPrefix: "POSTGRES",
+    });
+    const tables = await this.resolvePostgresTables(targets);
     if (!tables.length) {
       throw new Error(
-        `Postgres table not found or not visible: ${this.schemaName}.${this.tableName}`
+        `Postgres table_data: none of the configured tables were found or visible (${targets
+          .map((t) => `${t.schemaName}.${t.tableName}`)
+          .join(", ")})`
       );
     }
 
@@ -438,6 +427,34 @@ export class PostgresConnector extends DataConnector {
         `[postgres] table_data ${schemaName}.${tableName} done (${extractedRows} rows, ${pageNumber} pages)`
       );
     }
+  }
+
+  async resolvePostgresTables(targets) {
+    const filter = this.client.tableSchemaFilter(this.allowedSchemas);
+    const found = [];
+    for (const target of targets) {
+      const params = [...filter.params, target.schemaName, target.tableName];
+      const schemaParam = `$${filter.params.length + 1}`;
+      const tableParam = `$${filter.params.length + 2}`;
+      const rows = await this.client.query(
+        `
+        SELECT table_schema, table_name
+        FROM information_schema.tables
+        WHERE table_type = 'BASE TABLE' ${filter.clause}
+          AND table_schema = ${schemaParam}
+          AND table_name = ${tableParam}
+        `,
+        params
+      );
+      if (!rows.length) {
+        console.log(
+          `[postgres] table_data skipped missing table ${target.schemaName}.${target.tableName}`
+        );
+        continue;
+      }
+      found.push(rows[0]);
+    }
+    return found;
   }
 
   async *extractChangedRows(schemaName, tableName, window) {

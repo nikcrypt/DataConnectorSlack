@@ -1,9 +1,11 @@
 import { createHash } from "node:crypto";
 import { DataConnector } from "../base/DataConnector.js";
 import { incrementalWindow } from "../base/incrementalWindow.js";
+import { resolveTableDataTargets } from "../base/resolveTableDataTargets.js";
 import { MSSQLClient } from "./MSSQLClient.js";
 
-const OBJECTS = ["schemas", "tables", "columns", "constraints", "table_data"];
+const METADATA_OBJECTS = ["schemas", "tables", "columns", "constraints"];
+const OBJECTS = [...METADATA_OBJECTS, "table_data"];
 const CHECKPOINT_OBJECTS = new Set(["tables", "columns", "constraints", "table_data"]);
 const DATE_TYPES = new Set(["datetime", "datetime2", "datetimeoffset", "smalldatetime", "date"]);
 const MODIFIED_COLUMN_NAMES = [
@@ -28,6 +30,7 @@ export class MSSQLConnector extends DataConnector {
       : 1000;
     this.schemaName = config.schemaName || null;
     this.tableName = config.tableName || null;
+    this.tablesSpec = config.tablesSpec || null;
     this.modifiedColumn = config.modifiedColumn || null;
   }
 
@@ -46,6 +49,7 @@ export class MSSQLConnector extends DataConnector {
       pageSize: Number.isFinite(pageSize) && pageSize > 0 ? pageSize : 1000,
       schemaName: explicitSchema,
       tableName: explicitTable,
+      tablesSpec: process.env.MSSQL_TABLES?.trim() || null,
       modifiedColumn: process.env.MSSQL_MODIFIED_COLUMN?.trim() || null,
     });
   }
@@ -56,6 +60,11 @@ export class MSSQLConnector extends DataConnector {
 
   getObjects() {
     return [...OBJECTS];
+  }
+
+  /** Metadata only — table_data is opt-in via --objects table_data */
+  getDefaultObjects() {
+    return [...METADATA_OBJECTS];
   }
 
   async testConnection() {
@@ -313,30 +322,27 @@ export class MSSQLConnector extends DataConnector {
     }
   }
 
+  /**
+   * Read actual table rows (paginated).
+   * Configure MSSQL_SCHEMA + MSSQL_TABLE, or MSSQL_TABLES (comma-separated).
+   */
   async *extractTableData(options = {}) {
-    const filter = this.client.schemaFilter(this.allowedSchemas, "s.name");
-    const baseWhere = [];
-    if (this.schemaName) {
-      baseWhere.push(`s.name = '${this.schemaName.replace(/'/g, "''")}'`);
+    const targets = resolveTableDataTargets({
+      schema: this.schemaName,
+      table: this.tableName,
+      tables: this.tablesSpec,
+      envPrefix: "MSSQL",
+    });
+    const tables = await this.resolveMssqlTables(targets);
+    if (!tables.length) {
+      throw new Error(
+        `MSSQL table_data: none of the configured tables were found or visible (${targets
+          .map((t) => `${t.schemaName}.${t.tableName}`)
+          .join(", ")})`
+      );
     }
-    if (this.tableName) {
-      baseWhere.push(`t.name = '${this.tableName.replace(/'/g, "''")}'`);
-    }
-
-    const whereClause = baseWhere.length ? `AND ${baseWhere.join(" AND ")}` : "";
-
-    const tables = await this.client.query(`
-      SELECT s.name AS schema_name, t.name AS table_name
-      FROM sys.tables t
-      INNER JOIN sys.schemas s ON t.schema_id = s.schema_id
-      WHERE t.is_ms_shipped = 0 ${filter.clause} ${whereClause}
-      ORDER BY s.name, t.name
-    `);
 
     const window = incrementalWindow(options);
-    if (!window && !this.schemaName && !this.tableName) {
-      console.log("[mssql] table_data will read every user table. Set MSSQL_SCHEMA and MSSQL_TABLE to limit it.");
-    }
     if (window) {
       console.log(`[mssql] incremental table rows modified from ${window.since.toISOString()} until ${window.until.toISOString()}`);
     }
@@ -348,19 +354,25 @@ export class MSSQLConnector extends DataConnector {
         yield* this.extractChangedRows(schemaName, tableName, window);
         continue;
       }
+
       const fullTableName = `${quoteIdentifier(schemaName)}.${quoteIdentifier(tableName)}`;
       const tableColumns = await this.client.getTableColumns(schemaName, tableName);
-      const orderBy = tableColumns.length
-        ? tableColumns.map((column) => quoteIdentifier(column)).join(", ")
-        : "1";
+      const pkColumns = await this.primaryKeyColumns(schemaName, tableName);
+      const orderColumns = pkColumns.length ? pkColumns : tableColumns.slice(0, 1);
+      const orderBy = orderColumns.length
+        ? orderColumns.map((column) => quoteIdentifier(column)).join(", ")
+        : "(SELECT NULL)";
 
-      const totalRowsResult = await this.client.query(`SELECT COUNT(*) AS total_rows FROM ${fullTableName}`);
-      const totalRows = Number(totalRowsResult[0]?.total_rows || 0);
+      console.log(
+        `[mssql] table_data ${schemaName}.${tableName} pageSize=${this.pageSize} orderBy=${orderColumns.join(",") || "1"}`
+      );
 
+      // Skip COUNT(*) — expensive on large tables. Stop when a page is short.
       let offset = 0;
       let pageNumber = 0;
+      let extractedRows = 0;
 
-      while (offset < totalRows) {
+      while (true) {
         const pageRows = await this.client.query(`
           SELECT * FROM ${fullTableName}
           ORDER BY ${orderBy}
@@ -378,6 +390,8 @@ export class MSSQLConnector extends DataConnector {
           }
           return out;
         });
+        extractedRows += dataRows.length;
+        const hasMore = pageRows.length >= this.pageSize;
 
         const sourceId = `${schemaName}.${tableName}.page-${pageNumber}`;
         yield this.record("table_data", sourceId, {
@@ -386,25 +400,52 @@ export class MSSQLConnector extends DataConnector {
           pageNumber,
           pageSize: this.pageSize,
           offset,
-          totalRows,
+          totalRows: null,
           rowCount: dataRows.length,
           columns,
           rows: dataRows,
-          hasMore: offset + dataRows.length < totalRows,
+          hasMore,
         }, {
           schemaName,
           tableName,
           pageNumber,
           offset,
-          totalRows,
           pageSize: this.pageSize,
           rowCount: dataRows.length,
           rows: dataRows,
         });
 
         offset += pageRows.length;
+        if (!hasMore) break;
       }
+
+      console.log(
+        `[mssql] table_data ${schemaName}.${tableName} done (${extractedRows} rows, ${pageNumber} pages)`
+      );
     }
+  }
+
+  async resolveMssqlTables(targets) {
+    const filter = this.client.schemaFilter(this.allowedSchemas, "s.name");
+    const found = [];
+    for (const target of targets) {
+      const rows = await this.client.query(`
+        SELECT s.name AS schema_name, t.name AS table_name
+        FROM sys.tables t
+        INNER JOIN sys.schemas s ON t.schema_id = s.schema_id
+        WHERE t.is_ms_shipped = 0 ${filter.clause}
+          AND s.name = '${escapeLiteral(target.schemaName)}'
+          AND t.name = '${escapeLiteral(target.tableName)}'
+      `);
+      if (!rows.length) {
+        console.log(
+          `[mssql] table_data skipped missing table ${target.schemaName}.${target.tableName}`
+        );
+        continue;
+      }
+      found.push(rows[0]);
+    }
+    return found;
   }
 
   async catalogWindow(options) {
@@ -440,17 +481,13 @@ export class MSSQLConnector extends DataConnector {
 
     const tableColumns = await this.client.getTableColumns(schemaName, tableName);
     const pkColumns = await this.primaryKeyColumns(schemaName, tableName);
-    const orderColumns = pkColumns.length ? pkColumns : tableColumns;
+    const orderColumns = pkColumns.length ? pkColumns : tableColumns.slice(0, 1);
     const orderBy = orderColumns.length
       ? orderColumns.map((name) => quoteIdentifier(name)).join(", ")
-      : "1";
-    const totalRowsResult = await this.client.query(
-      `SELECT COUNT(*) AS total_rows FROM ${fullTableName} WHERE ${rowFilter}`
-    );
-    const totalRows = Number(totalRowsResult[0]?.total_rows || 0);
+      : "(SELECT NULL)";
     let offset = 0;
 
-    while (offset < totalRows) {
+    while (true) {
       const pageRows = await this.client.query(`
         SELECT * FROM ${fullTableName}
         WHERE ${rowFilter}
@@ -475,7 +512,7 @@ export class MSSQLConnector extends DataConnector {
           pageNumber: null,
           pageSize: 1,
           offset: null,
-          totalRows,
+          totalRows: null,
           rowCount: 1,
           columns,
           rows: [dataRow],
@@ -491,6 +528,7 @@ export class MSSQLConnector extends DataConnector {
         });
       }
       offset += pageRows.length;
+      if (pageRows.length < this.pageSize) break;
     }
   }
 
