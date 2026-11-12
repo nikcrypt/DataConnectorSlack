@@ -75,9 +75,7 @@ async function runJob(job) {
 
   const connector = await createConnector(job.connector_key);
   const known = new Set(connector.getObjects());
-  const selected = job.objects.length
-    ? job.objects
-    : (connector.getDefaultObjects?.() || connector.getObjects());
+ 
   const unknown = selected.filter((object) => !known.has(object));
   if (unknown.length) {
     throw new Error(
