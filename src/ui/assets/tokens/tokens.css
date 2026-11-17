@@ -1,0 +1,173 @@
+/* ==========================================================================
+   AZIRO DESIGN SYSTEM — Design Tokens
+   Extracted from "WIP Aziro Corporate Presentation May 2026.pptx"
+   UI font: Inter (Google Fonts). The source deck uses Corbel.
+   ========================================================================== */
+
+:root {
+  /* ---------------------------------------------------------------------
+     BRAND — Core identity
+     --------------------------------------------------------------------- */
+  --az-blue:            #2B50A3;   /* Primary brand blue (dominant)        */
+  --az-blue-bright:     #185DB8;   /* Bright azure — links, highlights     */
+  --az-orange:          #FE6701;   /* Signature accent orange              */
+  --az-ink:             #323A3B;   /* Primary text — warm charcoal         */
+
+  /* ---------------------------------------------------------------------
+     BLUE RAMP (primary)
+     --------------------------------------------------------------------- */
+  --az-blue-50:         #EDF0FC;
+  --az-blue-100:        #BCC9F5;
+  --az-blue-200:        #A3C2E7;
+  --az-blue-400:        #185DB8;
+  --az-blue-600:        #2B50A3;
+  --az-blue-800:        #223F80;
+  --az-blue-900:        #1A2F60;
+
+  /* ---------------------------------------------------------------------
+     ORANGE RAMP (accent)
+     --------------------------------------------------------------------- */
+  --az-orange-50:       #FFF1E7;
+  --az-orange-100:      #FFD9BF;
+  --az-orange-500:      #FE6701;   /* brand accent */
+  --az-orange-600:      #EA7433;
+  --az-orange-700:      #C85408;
+
+  /* ---------------------------------------------------------------------
+     SUPPORTING ACCENTS (charts, categories, data-viz)
+     --------------------------------------------------------------------- */
+  --az-teal:            #3F9880;
+  --az-teal-bright:     #4BA692;
+  --az-slate:           #435D74;
+  --az-slate-alt:       #445469;
+  --az-red:             #F02647;
+  --az-yellow:          #FAB900;
+  --az-purple:          #834E9F;
+
+  /* ---------------------------------------------------------------------
+     NEUTRALS
+     --------------------------------------------------------------------- */
+  --az-white:           #FFFFFF;
+  --az-neutral-50:      #F2F2F2;
+  --az-neutral-100:     #E7E6E6;
+  --az-neutral-200:     #D8D7D2;
+  --az-neutral-300:     #C9C9C9;
+  --az-neutral-400:     #C1BFB9;
+  --az-neutral-500:     #969696;
+  --az-neutral-600:     #878787;
+  --az-neutral-700:     #5A6566;
+  --az-neutral-800:     #323A3B;
+  --az-neutral-900:     #222222;
+  --az-black:           #020302;
+
+  /* ---------------------------------------------------------------------
+     SEMANTIC
+     --------------------------------------------------------------------- */
+  --az-color-bg:            var(--az-white);
+  --az-color-surface:       var(--az-white);
+  --az-color-surface-muted: var(--az-neutral-50);
+  --az-color-surface-brand: var(--az-blue-50);
+  --az-color-text:          var(--az-ink);
+  --az-color-text-muted:    var(--az-neutral-600);
+  --az-color-text-invert:   var(--az-white);
+  --az-color-border:        var(--az-neutral-100);
+  --az-color-border-strong: var(--az-neutral-300);
+  --az-color-primary:       var(--az-blue-600);
+  --az-color-accent:        var(--az-orange-500);
+  --az-color-link:          var(--az-blue-bright);
+  --az-color-success:       var(--az-teal);
+  --az-color-warning:       var(--az-yellow);
+  --az-color-danger:        var(--az-red);
+  --az-color-info:          var(--az-blue-bright);
+
+  /* ---------------------------------------------------------------------
+     TYPOGRAPHY
+     UI typeface: Inter, loaded from Google Fonts by each page. Falls back to the system UI font.
+     --------------------------------------------------------------------- */
+  --az-font-brand: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --az-font-body:  "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --az-font-mono:  "SFMono-Regular", "Cascadia Code", "JetBrains Mono", ui-monospace, monospace;
+
+  /* Type scale — mapped from deck point sizes to a web rem scale (16px base) */
+  --az-text-xs:    0.75rem;   /* 12px  · micro-labels                */
+  --az-text-sm:    0.875rem;  /* 14px  · captions (deck 14pt)        */
+  --az-text-base:  1rem;      /* 16px  · body                        */
+  --az-text-lg:    1.125rem;  /* 18px  · lead body                   */
+  --az-text-xl:    1.375rem;  /* 22px  · subheads (deck 20pt)        */
+  --az-text-2xl:   1.75rem;   /* 28px  · h4 (deck 28pt)              */
+  --az-text-3xl:   2.25rem;   /* 36px  · h3 (deck 36pt)              */
+  --az-text-4xl:   3rem;      /* 48px  · h2 (deck 48pt)              */
+  --az-text-5xl:   4rem;      /* 64px  · h1 / display                */
+  --az-text-6xl:   5.5rem;    /* 88px  · hero display                */
+  --az-text-display: 8rem;    /* 128px · statement (deck 128pt)      */
+
+  --az-weight-light:    300;
+  --az-weight-regular:  400;
+  --az-weight-medium:   500;
+  --az-weight-semibold: 600;
+  --az-weight-bold:     700;
+
+  --az-leading-tight:   1.1;
+  --az-leading-snug:    1.25;
+  --az-leading-normal:  1.5;
+  --az-leading-relaxed: 1.7;
+
+  --az-tracking-tight:  -0.02em;
+  --az-tracking-normal: 0;
+  --az-tracking-wide:   0.04em;
+  --az-tracking-caps:   0.14em;
+
+  /* ---------------------------------------------------------------------
+     SPACING — 4px base grid
+     --------------------------------------------------------------------- */
+  --az-space-1:   0.25rem;   /* 4  */
+  --az-space-2:   0.5rem;    /* 8  */
+  --az-space-3:   0.75rem;   /* 12 */
+  --az-space-4:   1rem;      /* 16 */
+  --az-space-5:   1.5rem;    /* 24 */
+  --az-space-6:   2rem;      /* 32 */
+  --az-space-7:   3rem;      /* 48 */
+  --az-space-8:   4rem;      /* 64 */
+  --az-space-9:   6rem;      /* 96 */
+  --az-space-10:  8rem;      /* 128 */
+
+  /* ---------------------------------------------------------------------
+     RADIUS — brand uses soft geometric rounding
+     --------------------------------------------------------------------- */
+  --az-radius-sm:   6px;
+  --az-radius-md:   10px;
+  --az-radius-lg:   16px;
+  --az-radius-xl:   24px;
+  --az-radius-2xl:  32px;
+  --az-radius-pill: 999px;
+
+  /* ---------------------------------------------------------------------
+     ELEVATION — soft, blue-tinted shadows
+     --------------------------------------------------------------------- */
+  --az-shadow-sm: 0 1px 2px rgba(43, 80, 163, 0.08);
+  --az-shadow-md: 0 6px 20px rgba(43, 80, 163, 0.10);
+  --az-shadow-lg: 0 18px 48px rgba(43, 80, 163, 0.16);
+  --az-shadow-accent: 0 12px 32px rgba(254, 103, 1, 0.28);
+
+  /* ---------------------------------------------------------------------
+     MOTION
+     --------------------------------------------------------------------- */
+  --az-ease:       cubic-bezier(0.22, 1, 0.36, 1);
+  --az-ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --az-dur-fast:   140ms;
+  --az-dur:        260ms;
+  --az-dur-slow:   520ms;
+
+  /* ---------------------------------------------------------------------
+     LAYOUT
+     --------------------------------------------------------------------- */
+  --az-container:   1200px;
+  --az-container-wide: 1400px;
+
+  /* ---------------------------------------------------------------------
+     SIGNATURE GRADIENTS
+     --------------------------------------------------------------------- */
+  --az-gradient-brand:  linear-gradient(120deg, #2B50A3 0%, #185DB8 100%);
+  --az-gradient-accent: linear-gradient(120deg, #FE6701 0%, #EA7433 100%);
+  --az-gradient-duo:    linear-gradient(120deg, #2B50A3 0%, #185DB8 55%, #FE6701 100%);
+}

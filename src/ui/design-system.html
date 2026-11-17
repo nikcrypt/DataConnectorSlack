@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Aziro — Design System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="assets/tokens/tokens.css" />
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: var(--az-font-body);
+    color: var(--az-color-text);
+    background: var(--az-white);
+    line-height: var(--az-leading-normal);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    overflow-x: hidden;
+  }
+
+  ::selection { background: var(--az-orange-500); color: #fff; }
+
+  a { color: var(--az-color-link); text-decoration: none; }
+
+  /* ---------- Layout shell ---------- */
+  .shell { display: grid; grid-template-columns: 264px 1fr; }
+
+  .sidebar {
+    position: sticky; top: 0; height: 100vh; align-self: start;
+    background: var(--az-ink);
+    color: #fff;
+    padding: var(--az-space-6) var(--az-space-5);
+    display: flex; flex-direction: column; gap: var(--az-space-6);
+    overflow-y: auto;
+    z-index: 10;
+  }
+  .sidebar::-webkit-scrollbar { width: 6px; }
+  .sidebar::-webkit-scrollbar-thumb { background: rgba(255,255,255,.18); border-radius: 99px; }
+
+  .brand-lockup { display: flex; align-items: center; gap: 12px; }
+  .wordmark { font-weight: 700; font-size: 1.6rem; letter-spacing: -0.03em; color: #fff; }
+  .wordmark span { color: var(--az-orange-500); }
+
+  .sidebar nav { display: flex; flex-direction: column; gap: 2px; }
+  .sidebar nav a {
+    color: rgba(255,255,255,.62);
+    font-size: var(--az-text-sm);
+    font-weight: 500;
+    padding: 9px 14px;
+    border-radius: var(--az-radius-sm);
+    transition: all var(--az-dur-fast) var(--az-ease);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .sidebar nav a::before {
+    content: ""; width: 6px; height: 6px; border-radius: 2px;
+    background: rgba(255,255,255,.25); transition: all var(--az-dur-fast) var(--az-ease);
+  }
+  .sidebar nav a:hover { color: #fff; background: rgba(255,255,255,.06); }
+  .sidebar nav a:hover::before { background: var(--az-orange-500); transform: rotate(45deg); }
+
+  .side-foot { margin-top: auto; font-size: var(--az-text-xs); color: rgba(255,255,255,.4); line-height: 1.6; }
+
+  .main { min-width: 0; }
+
+  /* ---------- Hero ---------- */
+  .hero {
+    position: relative;
+    padding: clamp(3rem, 8vw, 7rem) clamp(1.5rem, 6vw, 6rem) clamp(3rem, 6vw, 5rem);
+    background: var(--az-blue-600);
+    color: #fff;
+    overflow: hidden;
+    isolation: isolate;
+  }
+  .hero::before {
+    content: ""; position: absolute; inset: 0; z-index: -2;
+    background: var(--az-gradient-brand);
+  }
+  /* geometric brand motifs */
+  .hero .shape { position: absolute; z-index: -1; }
+  .hero .circle-o {
+    width: 460px; height: 460px; border-radius: 50%;
+    background: var(--az-gradient-accent);
+    right: -140px; top: -160px; opacity: .92;
+    filter: blur(.2px);
+  }
+  .hero .circle-b {
+    width: 300px; height: 300px; border-radius: 50%;
+    border: 40px solid rgba(255,255,255,.10);
+    right: 180px; bottom: -170px;
+  }
+  .hero .quarter {
+    width: 240px; height: 240px; right: 40px; bottom: -1px;
+    background: var(--az-orange-500);
+    border-radius: 240px 0 0 0;
+    opacity: .0;
+  }
+  .hero .dots {
+    position: absolute; left: 42%; top: 24%; z-index: -1;
+    display: grid; grid-template-columns: repeat(5, 10px); gap: 16px; opacity: .35;
+  }
+  .hero .dots i { width: 6px; height: 6px; border-radius: 50%; background: #fff; display: block; }
+
+  .eyebrow {
+    display: inline-flex; align-items: center; gap: 10px;
+    font-size: var(--az-text-sm); font-weight: 600;
+    letter-spacing: var(--az-tracking-caps); text-transform: uppercase;
+    color: #fff; background: rgba(255,255,255,.14);
+    padding: 7px 14px; border-radius: var(--az-radius-pill);
+    backdrop-filter: blur(6px);
+  }
+  .hero h1 {
+    font-size: clamp(2.75rem, 7vw, 5.5rem);
+    line-height: .98; letter-spacing: -0.035em; font-weight: 800;
+    margin: var(--az-space-5) 0 var(--az-space-4);
+    max-width: 16ch;
+  }
+  .hero h1 em { font-style: normal; color: var(--az-orange-500); }
+  .hero p.lede { font-size: var(--az-text-xl); max-width: 52ch; color: rgba(255,255,255,.86); font-weight: 300; }
+  .hero .meta { margin-top: var(--az-space-6); display: flex; flex-wrap: wrap; gap: var(--az-space-6); }
+  .hero .meta div span { display: block; }
+  .hero .meta .k { font-size: var(--az-text-xs); letter-spacing: var(--az-tracking-wide); text-transform: uppercase; color: rgba(255,255,255,.55); }
+  .hero .meta .v { font-size: var(--az-text-lg); font-weight: 600; margin-top: 3px; }
+
+  /* ---------- Content sections ---------- */
+  .content { padding: clamp(2.5rem, 5vw, 5rem) clamp(1.5rem, 6vw, 6rem); max-width: 1400px; }
+
+  section { scroll-margin-top: 24px; margin-bottom: clamp(3.5rem, 7vw, 6rem); }
+
+  .sec-head { display: flex; align-items: baseline; gap: 16px; margin-bottom: var(--az-space-6); }
+  .sec-num {
+    font-size: var(--az-text-sm); font-weight: 700; color: var(--az-orange-500);
+    font-variant-numeric: tabular-nums; letter-spacing: .05em;
+  }
+  .sec-head h2 { font-size: var(--az-text-3xl); letter-spacing: -0.025em; font-weight: 700; color: var(--az-ink); }
+  .sec-head p { color: var(--az-color-text-muted); font-size: var(--az-text-base); margin-left: auto; max-width: 38ch; text-align: right; }
+
+  .rule { height: 3px; width: 56px; background: var(--az-gradient-accent); border-radius: 99px; margin-bottom: var(--az-space-6); }
+
+  /* ---------- Color ---------- */
+  .swatch-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: var(--az-space-4); }
+  .swatch {
+    border-radius: var(--az-radius-lg); overflow: hidden; background: #fff;
+    border: 1px solid var(--az-color-border); box-shadow: var(--az-shadow-sm);
+    transition: transform var(--az-dur) var(--az-ease), box-shadow var(--az-dur) var(--az-ease);
+    cursor: pointer;
+  }
+  .swatch:hover { transform: translateY(-4px); box-shadow: var(--az-shadow-md); }
+  .swatch .chip { height: 92px; display: flex; align-items: flex-end; padding: 10px; }
+  .swatch .chip .tick { font-size: 11px; font-weight: 600; color: rgba(255,255,255,.8); opacity: 0; transition: opacity var(--az-dur); }
+  .swatch:hover .chip .tick { opacity: 1; }
+  .swatch .info { padding: 12px 14px 14px; }
+  .swatch .info b { display: block; font-size: var(--az-text-sm); font-weight: 600; color: var(--az-ink); }
+  .swatch .info code { font-size: var(--az-text-xs); color: var(--az-color-text-muted); font-family: var(--az-font-mono); text-transform: uppercase; }
+
+  .band { display: grid; grid-template-columns: repeat(7, 1fr); border-radius: var(--az-radius-lg); overflow: hidden; box-shadow: var(--az-shadow-sm); margin-bottom: var(--az-space-4); }
+  .band > div { height: 76px; display: flex; align-items: flex-end; padding: 8px; font-size: 10px; font-family: var(--az-font-mono); font-weight: 600; }
+
+  /* ---------- Typography ---------- */
+  .type-row { display: grid; grid-template-columns: 90px 1fr; gap: var(--az-space-5); align-items: baseline; padding: var(--az-space-4) 0; border-bottom: 1px solid var(--az-color-border); }
+  .type-row .tag { font-size: var(--az-text-xs); font-family: var(--az-font-mono); color: var(--az-color-text-muted); }
+  .type-row .demo { color: var(--az-ink); letter-spacing: -0.02em; line-height: 1.05; }
+
+  .specimen { display: grid; grid-template-columns: 1.1fr 1fr; gap: var(--az-space-6); align-items: stretch; }
+  .specimen .big {
+    background: var(--az-ink); color: #fff; border-radius: var(--az-radius-xl);
+    padding: var(--az-space-6); display: flex; flex-direction: column; justify-content: space-between;
+    min-height: 260px; position: relative; overflow: hidden;
+  }
+  .specimen .big::after { content: ""; position: absolute; width: 200px; height: 200px; border-radius: 50%; background: var(--az-gradient-accent); right: -70px; bottom: -70px; opacity: .9; }
+  .specimen .big .glyph { font-size: 8rem; font-weight: 800; line-height: 1; letter-spacing: -0.04em; }
+  .specimen .big .name { position: relative; z-index: 1; font-size: var(--az-text-lg); font-weight: 600; }
+  .specimen .big .sub { font-size: var(--az-text-sm); color: rgba(255,255,255,.6); }
+  .weights { display: grid; gap: 10px; align-content: center; }
+  .weights div { display: flex; justify-content: space-between; align-items: baseline; padding: 10px 16px; border: 1px solid var(--az-color-border); border-radius: var(--az-radius-md); }
+  .weights div span:first-child { font-size: var(--az-text-lg); }
+  .weights div span:last-child { font-size: var(--az-text-xs); font-family: var(--az-font-mono); color: var(--az-color-text-muted); }
+
+  /* ---------- Generic card grid ---------- */
+  .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--az-space-5); }
+  .card {
+    background: #fff; border: 1px solid var(--az-color-border);
+    border-radius: var(--az-radius-lg); padding: var(--az-space-5);
+    box-shadow: var(--az-shadow-sm); transition: all var(--az-dur) var(--az-ease);
+  }
+  .card:hover { box-shadow: var(--az-shadow-md); transform: translateY(-3px); border-color: var(--az-blue-100); }
+  .card .ic { width: 44px; height: 44px; border-radius: var(--az-radius-md); display: grid; place-items: center; margin-bottom: var(--az-space-4); background: var(--az-blue-50); color: var(--az-blue-600); }
+  .card h4 { font-size: var(--az-text-lg); margin-bottom: 6px; color: var(--az-ink); }
+  .card p { font-size: var(--az-text-sm); color: var(--az-color-text-muted); }
+
+  /* ---------- Buttons ---------- */
+  .btn {
+    font-family: inherit; font-size: var(--az-text-base); font-weight: 600;
+    padding: 13px 26px; border-radius: var(--az-radius-pill); border: none; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 9px;
+    transition: transform var(--az-dur-fast) var(--az-ease), box-shadow var(--az-dur) var(--az-ease), background var(--az-dur);
+  }
+  .btn:active { transform: translateY(1px) scale(.99); }
+  .btn-primary { background: var(--az-blue-600); color: #fff; }
+  .btn-primary:hover { background: var(--az-blue-800); box-shadow: var(--az-shadow-md); }
+  .btn-accent { background: var(--az-orange-500); color: #fff; }
+  .btn-accent:hover { box-shadow: var(--az-shadow-accent); transform: translateY(-2px); }
+  .btn-outline { background: transparent; color: var(--az-blue-600); box-shadow: inset 0 0 0 2px var(--az-blue-600); }
+  .btn-outline:hover { background: var(--az-blue-50); }
+  .btn-ghost { background: var(--az-neutral-50); color: var(--az-ink); }
+  .btn-ghost:hover { background: var(--az-neutral-100); }
+  .btn-dark { background: var(--az-ink); color: #fff; }
+  .btn-dark:hover { background: #1f2526; box-shadow: var(--az-shadow-md); }
+  .btn-arrow { transition: transform var(--az-dur) var(--az-ease); }
+  .btn:hover .btn-arrow { transform: translateX(4px); }
+
+  .cluster { display: flex; flex-wrap: wrap; gap: var(--az-space-4); align-items: center; }
+
+  /* ---------- Badges ---------- */
+  .badge {
+    display: inline-flex; align-items: center; gap: 7px;
+    font-size: var(--az-text-sm); font-weight: 600; padding: 6px 14px; border-radius: var(--az-radius-pill);
+  }
+  .badge::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+  .badge-primary { background: var(--az-blue-50); color: var(--az-blue-600); }
+  .badge-accent { background: var(--az-orange-50); color: var(--az-orange-700); }
+  .badge-success { background: #e4f2ee; color: var(--az-teal); }
+  .badge-warning { background: #fff6dd; color: #a07500; }
+  .badge-danger  { background: #fde4e8; color: var(--az-red); }
+  .badge-neutral { background: var(--az-neutral-100); color: var(--az-neutral-700); }
+
+  /* ---------- Forms ---------- */
+  .form-demo { display: grid; grid-template-columns: 1fr 1fr; gap: var(--az-space-5); max-width: 720px; }
+  .field label { display: block; font-size: var(--az-text-sm); font-weight: 600; margin-bottom: 7px; color: var(--az-ink); }
+  .field input, .field select {
+    width: 100%; font-family: inherit; font-size: var(--az-text-base);
+    padding: 12px 15px; border-radius: var(--az-radius-md);
+    border: 1.5px solid var(--az-color-border-strong); background: #fff; color: var(--az-ink);
+    transition: border-color var(--az-dur-fast), box-shadow var(--az-dur-fast);
+  }
+  .field input:focus, .field select:focus { outline: none; border-color: var(--az-blue-600); box-shadow: 0 0 0 4px var(--az-blue-50); }
+  .toggle { display: inline-flex; align-items: center; gap: 12px; cursor: pointer; }
+  .toggle input { display: none; }
+  .toggle .track { width: 48px; height: 27px; border-radius: 99px; background: var(--az-neutral-300); position: relative; transition: background var(--az-dur); }
+  .toggle .track::after { content: ""; position: absolute; width: 21px; height: 21px; border-radius: 50%; background: #fff; top: 3px; left: 3px; transition: transform var(--az-dur) var(--az-ease); box-shadow: var(--az-shadow-sm); }
+  .toggle input:checked + .track { background: var(--az-blue-600); }
+  .toggle input:checked + .track::after { transform: translateX(21px); }
+
+  /* ---------- Spacing / radius / shadow ---------- */
+  .scale-row { display: flex; align-items: center; gap: var(--az-space-4); padding: 9px 0; }
+  .scale-row .bar { height: 20px; background: var(--az-gradient-brand); border-radius: 4px; }
+  .scale-row .lbl { font-size: var(--az-text-sm); font-family: var(--az-font-mono); color: var(--az-color-text-muted); min-width: 130px; }
+
+  .radius-grid, .shadow-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--az-space-5); }
+  .radius-demo { aspect-ratio: 1.4; background: var(--az-blue-50); border: 2px solid var(--az-blue-200); display: grid; place-items: end; padding: 12px; font-family: var(--az-font-mono); font-size: var(--az-text-xs); color: var(--az-blue-600); }
+  .shadow-demo { aspect-ratio: 1.5; background: #fff; border-radius: var(--az-radius-lg); display: grid; place-items: center; font-family: var(--az-font-mono); font-size: var(--az-text-xs); color: var(--az-color-text-muted); }
+
+  .grad-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--az-space-5); }
+  .grad { height: 130px; border-radius: var(--az-radius-lg); display: flex; align-items: flex-end; padding: 16px; color: #fff; font-weight: 600; font-size: var(--az-text-sm); box-shadow: var(--az-shadow-sm); }
+
+  /* ---------- Footer ---------- */
+  footer.foot { background: var(--az-ink); color: rgba(255,255,255,.7); padding: var(--az-space-8) clamp(1.5rem, 6vw, 6rem) var(--az-space-6); margin-top: var(--az-space-8); }
+  footer.foot .row { display: flex; justify-content: space-between; flex-wrap: wrap; gap: var(--az-space-5); align-items: center; }
+  footer.foot .wordmark { font-size: 1.3rem; }
+  footer.foot small { display: block; margin-top: var(--az-space-5); font-size: var(--az-text-xs); color: rgba(255,255,255,.4); }
+
+  /* ---------- Load animation ---------- */
+  [data-rise] { opacity: 0; transform: translateY(18px); animation: rise .7s var(--az-ease) forwards; }
+  @keyframes rise { to { opacity: 1; transform: none; } }
+
+  @media (max-width: 900px) {
+    .shell { grid-template-columns: 1fr; }
+    .sidebar { position: static; height: auto; flex-direction: row; align-items: center; overflow: visible; flex-wrap: wrap; }
+    .sidebar nav { flex-direction: row; flex-wrap: wrap; }
+    .sidebar nav a::before { display: none; }
+    .side-foot { display: none; }
+    .specimen, .form-demo { grid-template-columns: 1fr; }
+    .sec-head { flex-direction: column; }
+    .sec-head p { margin-left: 0; text-align: left; }
+  }
+  @media (prefers-reduced-motion: reduce) { [data-rise] { animation: none; opacity: 1; transform: none; } }
+</style>
+</head>
+<body>
+<div class="shell">
+  <!-- ============ SIDEBAR ============ -->
+  <aside class="sidebar">
+    <div class="brand-lockup">
+      <svg width="34" height="34" viewBox="0 0 40 40" fill="none" aria-hidden="true">
+        <rect width="40" height="40" rx="11" fill="#fff"/>
+        <path d="M20 6a14 14 0 0 1 14 14H20V6Z" fill="#FE6701"/>
+        <path d="M20 34A14 14 0 0 1 6 20h14v14Z" fill="#2B50A3"/>
+        <circle cx="20" cy="20" r="4.4" fill="#185DB8"/>
+      </svg>
+      <span class="wordmark">azir<span>o</span></span>
+    </div>
+    <nav>
+      <a href="login.html">EDAP sign in ↗</a>
+      <a href="app.html#overview">EDAP workspace ↗</a>
+      <a href="#foundation">Foundations</a>
+      <a href="#color">Color</a>
+      <a href="#type">Typography</a>
+      <a href="#space">Spacing</a>
+      <a href="#radius">Radius &amp; Elevation</a>
+      <a href="#gradient">Gradients</a>
+      <a href="#buttons">Buttons</a>
+      <a href="#badges">Badges</a>
+      <a href="#forms">Forms</a>
+      <a href="#cards">Cards</a>
+    </nav>
+    <div class="side-foot">
+      Aziro Design System · v1.0<br/>
+      Source: Corporate Deck, May 2026<br/>
+      Tokens · <a href="assets/tokens/tokens.css" style="color:var(--az-orange-500)">CSS</a> ·
+      <a href="assets/tokens/tokens.json" style="color:var(--az-orange-500)">JSON</a>
+    </div>
+  </aside>
+
+  <!-- ============ MAIN ============ -->
+  <main class="main">
+    <!-- HERO -->
+    <header class="hero">
+      <span class="shape circle-o"></span>
+      <span class="shape circle-b"></span>
+      <span class="dots" aria-hidden="true">
+        <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+        <i></i><i></i><i></i><i></i><i></i>
+      </span>
+      <div data-rise style="position:relative">
+        <span class="eyebrow">Design System · v1.0</span>
+        <h1>The Aziro <em>visual</em> language.</h1>
+        <p class="lede">A single source of truth for color, type, space and components — distilled directly from the Aziro corporate identity.</p>
+        <div class="meta">
+          <div><span class="k">Primary</span><span class="v">#2B50A3</span></div>
+          <div><span class="k">Accent</span><span class="v">#FE6701</span></div>
+          <div><span class="k">Typeface</span><span class="v">Inter</span></div>
+          <div><span class="k">Tokens</span><span class="v">120+</span></div>
+        </div>
+      </div>
+    </header>
+
+    <div class="content">
+
+      <!-- FOUNDATION -->
+      <section id="foundation">
+        <div class="sec-head">
+          <span class="sec-num">01</span>
+          <h2>Foundations</h2>
+          <p>The principles that keep every Aziro surface consistent and recognizable.</p>
+        </div>
+        <div class="rule"></div>
+        <div class="grid-3">
+          <div class="card" data-rise>
+            <div class="ic">◆</div>
+            <h4>Confident &amp; clear</h4>
+            <p>Deep blue anchors the brand; orange is used sparingly for emphasis and moments that matter.</p>
+          </div>
+          <div class="card" data-rise style="animation-delay:.08s">
+            <div class="ic">◐</div>
+            <h4>Geometric identity</h4>
+            <p>Circles, arcs and angular cuts echo the Aziro mark. Shapes carry the brand as much as color does.</p>
+          </div>
+          <div class="card" data-rise style="animation-delay:.16s">
+            <div class="ic">☰</div>
+            <h4>Systematic</h4>
+            <p>Everything sits on a 4px grid with a defined type scale, so layouts compose predictably.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- COLOR -->
+      <section id="color">
+        <div class="sec-head">
+          <span class="sec-num">02</span>
+          <h2>Color</h2>
+          <p>Blue leads, orange accents, charcoal grounds. Ramps give room for states and hierarchy.</p>
+        </div>
+        <div class="rule"></div>
+
+        <h4 style="margin-bottom:var(--az-space-4);color:var(--az-color-text-muted);font-weight:600;font-size:var(--az-text-sm);text-transform:uppercase;letter-spacing:var(--az-tracking-wide)">Brand</h4>
+        <div class="swatch-grid" style="margin-bottom:var(--az-space-6)">
+          <div class="swatch" data-rise><div class="chip" style="background:#2B50A3"><span class="tick">click to copy</span></div><div class="info"><b>Brand Blue</b><code>#2B50A3</code></div></div>
+          <div class="swatch" data-rise style="animation-delay:.05s"><div class="chip" style="background:#185DB8"><span class="tick">click to copy</span></div><div class="info"><b>Blue Bright</b><code>#185DB8</code></div></div>
+          <div class="swatch" data-rise style="animation-delay:.1s"><div class="chip" style="background:#FE6701"><span class="tick">click to copy</span></div><div class="info"><b>Accent Orange</b><code>#FE6701</code></div></div>
+          <div class="swatch" data-rise style="animation-delay:.15s"><div class="chip" style="background:#323A3B"><span class="tick">click to copy</span></div><div class="info"><b>Ink</b><code>#323A3B</code></div></div>
+        </div>
+
+        <h4 style="margin-bottom:var(--az-space-3);color:var(--az-color-text-muted);font-weight:600;font-size:var(--az-text-sm);text-transform:uppercase;letter-spacing:var(--az-tracking-wide)">Blue ramp</h4>
+        <div class="band">
+          <div style="background:#EDF0FC;color:#2B50A3">50</div>
+          <div style="background:#BCC9F5;color:#2B50A3">100</div>
+          <div style="background:#A3C2E7;color:#2B50A3">200</div>
+          <div style="background:#185DB8;color:#fff">400</div>
+          <div style="background:#2B50A3;color:#fff">600</div>
+          <div style="background:#223F80;color:#fff">800</div>
+          <div style="background:#1A2F60;color:#fff">900</div>
+        </div>
+
+        <h4 style="margin-bottom:var(--az-space-3);color:var(--az-color-text-muted);font-weight:600;font-size:var(--az-text-sm);text-transform:uppercase;letter-spacing:var(--az-tracking-wide)">Orange ramp</h4>
+        <div class="band" style="grid-template-columns:repeat(5,1fr)">
+          <div style="background:#FFF1E7;color:#C85408">50</div>
+          <div style="background:#FFD9BF;color:#C85408">100</div>
+          <div style="background:#FE6701;color:#fff">500</div>
+          <div style="background:#EA7433;color:#fff">600</div>
+          <div style="background:#C85408;color:#fff">700</div>
+        </div>
+
+        <h4 style="margin-bottom:var(--az-space-3);color:var(--az-color-text-muted);font-weight:600;font-size:var(--az-text-sm);text-transform:uppercase;letter-spacing:var(--az-tracking-wide)">Neutrals</h4>
+        <div class="band">
+          <div style="background:#FFFFFF;color:#323A3B;box-shadow:inset 0 0 0 1px #E7E6E6">white</div>
+          <div style="background:#F2F2F2;color:#323A3B">50</div>
+          <div style="background:#E7E6E6;color:#323A3B">100</div>
+          <div style="background:#C9C9C9;color:#323A3B">300</div>
+          <div style="background:#969696;color:#fff">500</div>
+          <div style="background:#5A6566;color:#fff">700</div>
+          <div style="background:#323A3B;color:#fff">800</div>
+        </div>
+
+        <h4 style="margin-bottom:var(--az-space-3);color:var(--az-color-text-muted);font-weight:600;font-size:var(--az-text-sm);text-transform:uppercase;letter-spacing:var(--az-tracking-wide)">Supporting accents &amp; data-viz</h4>
+        <div class="band" style="grid-template-columns:repeat(6,1fr)">
+          <div style="background:#3F9880;color:#fff">teal</div>
+          <div style="background:#4BA692;color:#fff">teal·br</div>
+          <div style="background:#435D74;color:#fff">slate</div>
+          <div style="background:#F02647;color:#fff">red</div>
+          <div style="background:#FAB900;color:#3a2c00">yellow</div>
+          <div style="background:#834E9F;color:#fff">purple</div>
+        </div>
+      </section>
+
+      <!-- TYPOGRAPHY -->
+      <section id="type">
+        <div class="sec-head">
+          <span class="sec-num">03</span>
+          <h2>Typography</h2>
+          <p>Inter is the UI typeface, loaded from Google Fonts. The corporate deck uses Corbel.</p>
+        </div>
+        <div class="rule"></div>
+
+        <div class="specimen" style="margin-bottom:var(--az-space-7)">
+          <div class="big" data-rise>
+            <div class="glyph">Aa</div>
+            <div>
+              <div class="name">Inter</div>
+              <div class="sub">Neo-grotesque sans-serif · fallback: system UI, Segoe UI</div>
+            </div>
+          </div>
+          <div class="weights" data-rise style="animation-delay:.1s">
+            <div><span style="font-weight:300">Aziro Light</span><span>300</span></div>
+            <div><span style="font-weight:400">Aziro Regular</span><span>400</span></div>
+            <div><span style="font-weight:500">Aziro Medium</span><span>500</span></div>
+            <div><span style="font-weight:600">Aziro Semibold</span><span>600</span></div>
+            <div><span style="font-weight:700">Aziro Bold</span><span>700</span></div>
+          </div>
+        </div>
+
+        <div>
+          <div class="type-row"><span class="tag">display · 128</span><div class="demo" style="font-size:clamp(3rem,7vw,6rem);font-weight:800">Bold ideas</div></div>
+          <div class="type-row"><span class="tag">5xl · 64</span><div class="demo" style="font-size:clamp(2.5rem,5vw,4rem);font-weight:700">Headline one</div></div>
+          <div class="type-row"><span class="tag">4xl · 48</span><div class="demo" style="font-size:3rem;font-weight:700">Section title</div></div>
+          <div class="type-row"><span class="tag">3xl · 36</span><div class="demo" style="font-size:2.25rem;font-weight:600">Subsection heading</div></div>
+          <div class="type-row"><span class="tag">2xl · 28</span><div class="demo" style="font-size:1.75rem;font-weight:600">Card heading</div></div>
+          <div class="type-row"><span class="tag">xl · 22</span><div class="demo" style="font-size:1.375rem;font-weight:500">Lead paragraph copy</div></div>
+          <div class="type-row"><span class="tag">base · 16</span><div class="demo" style="font-size:1rem;font-weight:400;letter-spacing:0;line-height:1.6">Body copy sets the baseline for readable, comfortable reading across the Aziro product surface.</div></div>
+          <div class="type-row"><span class="tag">sm · 14</span><div class="demo" style="font-size:.875rem;color:var(--az-color-text-muted);letter-spacing:0">Caption &amp; supporting text</div></div>
+          <div class="type-row"><span class="tag">xs · 12</span><div class="demo" style="font-size:.75rem;text-transform:uppercase;letter-spacing:.14em;color:var(--az-orange-700);font-weight:600">Overline label</div></div>
+        </div>
+      </section>
+
+      <!-- SPACING -->
+      <section id="space">
+        <div class="sec-head">
+          <span class="sec-num">04</span>
+          <h2>Spacing</h2>
+          <p>A 4px base grid. Steps scale to keep rhythm from tight UI to expansive layouts.</p>
+        </div>
+        <div class="rule"></div>
+        <div>
+          <div class="scale-row"><span class="lbl">space-1 · 4px</span><div class="bar" style="width:4px"></div></div>
+          <div class="scale-row"><span class="lbl">space-2 · 8px</span><div class="bar" style="width:8px"></div></div>
+          <div class="scale-row"><span class="lbl">space-3 · 12px</span><div class="bar" style="width:12px"></div></div>
+          <div class="scale-row"><span class="lbl">space-4 · 16px</span><div class="bar" style="width:16px"></div></div>
+          <div class="scale-row"><span class="lbl">space-5 · 24px</span><div class="bar" style="width:24px"></div></div>
+          <div class="scale-row"><span class="lbl">space-6 · 32px</span><div class="bar" style="width:32px"></div></div>
+          <div class="scale-row"><span class="lbl">space-7 · 48px</span><div class="bar" style="width:48px"></div></div>
+          <div class="scale-row"><span class="lbl">space-8 · 64px</span><div class="bar" style="width:64px"></div></div>
+          <div class="scale-row"><span class="lbl">space-9 · 96px</span><div class="bar" style="width:96px"></div></div>
+          <div class="scale-row"><span class="lbl">space-10 · 128px</span><div class="bar" style="width:128px"></div></div>
+        </div>
+      </section>
+
+      <!-- RADIUS & ELEVATION -->
+      <section id="radius">
+        <div class="sec-head">
+          <span class="sec-num">05</span>
+          <h2>Radius &amp; Elevation</h2>
+          <p>Soft geometric corners and blue-tinted shadows give depth without noise.</p>
+        </div>
+        <div class="rule"></div>
+        <div class="radius-grid" style="margin-bottom:var(--az-space-7)">
+          <div class="radius-demo" style="border-radius:6px">sm · 6</div>
+          <div class="radius-demo" style="border-radius:10px">md · 10</div>
+          <div class="radius-demo" style="border-radius:16px">lg · 16</div>
+          <div class="radius-demo" style="border-radius:24px">xl · 24</div>
+          <div class="radius-demo" style="border-radius:32px">2xl · 32</div>
+          <div class="radius-demo" style="border-radius:999px">pill</div>
+        </div>
+        <div class="shadow-grid">
+          <div class="shadow-demo" style="box-shadow:var(--az-shadow-sm)">shadow-sm</div>
+          <div class="shadow-demo" style="box-shadow:var(--az-shadow-md)">shadow-md</div>
+          <div class="shadow-demo" style="box-shadow:var(--az-shadow-lg)">shadow-lg</div>
+          <div class="shadow-demo" style="box-shadow:var(--az-shadow-accent)">shadow-accent</div>
+        </div>
+      </section>
+
+      <!-- GRADIENTS -->
+      <section id="gradient">
+        <div class="sec-head">
+          <span class="sec-num">06</span>
+          <h2>Gradients</h2>
+          <p>Signature blends used on heroes, key cards and brand moments.</p>
+        </div>
+        <div class="rule"></div>
+        <div class="grad-grid">
+          <div class="grad" style="background:var(--az-gradient-brand)">Brand</div>
+          <div class="grad" style="background:var(--az-gradient-accent)">Accent</div>
+          <div class="grad" style="background:var(--az-gradient-duo)">Duo</div>
+        </div>
+      </section>
+
+      <!-- BUTTONS -->
+      <section id="buttons">
+        <div class="sec-head">
+          <span class="sec-num">07</span>
+          <h2>Buttons</h2>
+          <p>Blue for primary paths, orange to accelerate the moments that convert.</p>
+        </div>
+        <div class="rule"></div>
+        <div class="cluster">
+          <button class="btn btn-primary">Primary action</button>
+          <button class="btn btn-accent">Get started <span class="btn-arrow">→</span></button>
+          <button class="btn btn-outline">Outline</button>
+          <button class="btn btn-ghost">Ghost</button>
+          <button class="btn btn-dark">On dark</button>
+        </div>
+      </section>
+
+      <!-- BADGES -->
+      <section id="badges">
+        <div class="sec-head">
+          <span class="sec-num">08</span>
+          <h2>Badges &amp; Status</h2>
+          <p>Compact signals built from the semantic palette.</p>
+        </div>
+        <div class="rule"></div>
+        <div class="cluster">
+          <span class="badge badge-primary">Primary</span>
+          <span class="badge badge-accent">Featured</span>
+          <span class="badge badge-success">Active</span>
+          <span class="badge badge-warning">Pending</span>
+          <span class="badge badge-danger">Blocked</span>
+          <span class="badge badge-neutral">Draft</span>
+        </div>
+      </section>
+
+      <!-- FORMS -->
+      <section id="forms">
+        <div class="sec-head">
+          <span class="sec-num">09</span>
+          <h2>Form Controls</h2>
+          <p>Focus states use the brand blue with a soft tint halo.</p>
+        </div>
+        <div class="rule"></div>
+        <div class="form-demo">
+          <div class="field"><label>Full name</label><input type="text" placeholder="Ada Lovelace" /></div>
+          <div class="field"><label>Work email</label><input type="email" placeholder="you@aziro.com" /></div>
+          <div class="field"><label>Service line</label>
+            <select><option>Cloud &amp; Platform</option><option>Data &amp; AI</option><option>Digital Engineering</option></select>
+          </div>
+          <div class="field" style="display:flex;flex-direction:column;justify-content:flex-end;gap:14px">
+            <label>Preferences</label>
+            <label class="toggle"><input type="checkbox" checked /><span class="track"></span> Email updates</label>
+            <label class="toggle"><input type="checkbox" /><span class="track"></span> Product research</label>
+          </div>
+        </div>
+      </section>
+
+      <!-- CARDS -->
+      <section id="cards">
+        <div class="sec-head">
+          <span class="sec-num">10</span>
+          <h2>Cards</h2>
+          <p>The core content container — lift on hover, brand-tinted iconography.</p>
+        </div>
+        <div class="rule"></div>
+        <div class="grid-3">
+          <div class="card">
+            <div class="ic" style="background:var(--az-orange-50);color:var(--az-orange-700)">✦</div>
+            <h4>Cloud &amp; Platform</h4>
+            <p>Modernize infrastructure with resilient, secure and scalable foundations.</p>
+            <div style="margin-top:16px"><a href="#" style="font-weight:600">Explore <span class="btn-arrow">→</span></a></div>
+          </div>
+          <div class="card">
+            <div class="ic">◈</div>
+            <h4>Data &amp; AI</h4>
+            <p>Turn raw signals into decisions with pipelines, models and governance.</p>
+            <div style="margin-top:16px"><a href="#" style="font-weight:600">Explore <span class="btn-arrow">→</span></a></div>
+          </div>
+          <div class="card" style="background:var(--az-ink);border:none">
+            <div class="ic" style="background:rgba(255,255,255,.12);color:#fff">◐</div>
+            <h4 style="color:#fff">Digital Engineering</h4>
+            <p style="color:rgba(255,255,255,.65)">Ship product-grade software with velocity and craft, end to end.</p>
+            <div style="margin-top:16px"><a href="#" style="font-weight:600;color:var(--az-orange-500)">Explore <span class="btn-arrow">→</span></a></div>
+          </div>
+        </div>
+      </section>
+
+    </div><!-- /content -->
+
+    <footer class="foot">
+      <div class="row">
+        <span class="wordmark">azir<span style="color:var(--az-orange-500)">o</span></span>
+        <div class="cluster">
+          <a href="assets/tokens/tokens.css" style="color:rgba(255,255,255,.7)">tokens.css</a>
+          <a href="assets/tokens/tokens.json" style="color:rgba(255,255,255,.7)">tokens.json</a>
+          <a href="MD/README.md" style="color:rgba(255,255,255,.7)">Docs</a>
+        </div>
+      </div>
+      <small>Aziro Design System v1.0 · Generated from “WIP Aziro Corporate Presentation May 2026”. Colors, type and spacing reflect the source brand assets.</small>
+    </footer>
+  </main>
+</div>
+
+<script>
+  // click-to-copy on swatches & bands
+  function copy(text){ navigator.clipboard && navigator.clipboard.writeText(text); }
+  document.querySelectorAll('.swatch').forEach(s => {
+    s.addEventListener('click', () => {
+      const hex = s.querySelector('code')?.textContent?.trim();
+      if(!hex) return;
+      copy(hex);
+      const t = s.querySelector('.tick'); if(t){ const o=t.textContent; t.textContent='copied ✓'; t.style.opacity=1; setTimeout(()=>{t.textContent=o;},1100); }
+    });
+  });
+  // active nav highlight
+  const links = [...document.querySelectorAll('.sidebar nav a')];
+  const map = new Map(links.map(l => [l.getAttribute('href').slice(1), l]));
+  const io = new IntersectionObserver((es)=>{
+    es.forEach(e=>{ if(e.isIntersecting){ links.forEach(l=>l.style.color=''); const a=map.get(e.target.id); if(a){a.style.color='#fff';} } });
+  }, { rootMargin: '-45% 0px -50% 0px' });
+  document.querySelectorAll('section[id]').forEach(s=>io.observe(s));
+</script>
+</body>
+</html>

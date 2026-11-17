@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Sign in to your EDAP workspace.">
+<title>Sign in · EDAP</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap">
+<link rel="stylesheet" href="assets/tokens/tokens.css">
+<link rel="stylesheet" href="assets/tokens/edap-tokens.css?v=1">
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:var(--az-font-body);color:var(--edap-ink);background:var(--edap-surface)}button,input{font:inherit}a{color:var(--az-blue);text-decoration:none}a:hover{text-decoration:underline}button,a,input{ -webkit-tap-highlight-color:transparent} :focus-visible{outline:3px solid var(--edap-focus);outline-offset:4px}.layout{min-height:100svh;display:grid;grid-template-columns:46% 54%}.story{background:var(--az-blue-900);color:white;padding:48px 56px;position:relative;overflow:hidden;display:flex;flex-direction:column;isolation:isolate}.logo{font-size:2rem;font-weight:800;letter-spacing:-1.7px;color:inherit;display:inline-flex;align-items:center;gap:4px;width:fit-content}.logo span{color:var(--az-orange)}.logo:hover{text-decoration:none}.story-copy{margin:auto 0;position:relative;z-index:2;padding:88px 0 112px;max-width:430px}.eyebrow{text-transform:uppercase;font-size:var(--edap-text-xs);font-weight:700;letter-spacing:var(--az-tracking-caps);display:flex;align-items:center;gap:12px;color:var(--edap-on-dark-muted)}.eyebrow:before{content:"";width:25px;height:2px;background:var(--az-orange)}h1{font-size:clamp(42px,4.4vw,68px);line-height:1.07;letter-spacing:-2.8px;font-weight:500;margin:28px 0 24px}h1 em{font-style:normal;color:var(--az-orange)}.story-copy>p{font-size:var(--edap-text-lg);line-height:1.7;color:var(--edap-on-dark-muted);max-width:325px}.story-foot{font-size:var(--edap-text-xs);color:var(--edap-on-dark-muted);position:relative;z-index:2;display:flex;align-items:center;gap:12px}.story-foot i{height:5px;width:5px;background:var(--az-orange);border-radius:50%}.orbit{position:absolute;width:550px;height:550px;border:1px solid #ffffff18;border-radius:50%;right:-300px;bottom:-200px;z-index:-1}.orbit:before,.orbit:after{content:"";position:absolute;border:1px solid #ffffff18;border-radius:50%;inset:55px}.orbit:after{inset:110px}.accent{position:absolute;width:140px;height:140px;background:var(--az-orange);border-radius:140px 0 0 0;right:0;bottom:0}.small-ring{position:absolute;width:130px;height:130px;border:26px solid #ffffff05;border-radius:50%;top:90px;right:-50px}.content{padding:40px 7%;display:flex;flex-direction:column;min-width:0}.topline{display:flex;justify-content:flex-end;font-size:var(--edap-text-sm);color:var(--edap-text-muted);gap:8px}.topline a{font-weight:600}.form-wrap{width:100%;max-width:400px;margin:auto;padding:64px 0}.badge{width:48px;height:48px;border:1px solid var(--edap-border);border-radius:12px;display:grid;place-items:center;background:var(--edap-blue-50);color:var(--az-blue);margin-bottom:28px}.badge svg{width:24px;height:24px}h2{font-size:var(--az-text-3xl);line-height:1.25;letter-spacing:var(--az-tracking-tight);margin:0 0 10px;font-weight:600}.intro{color:var(--edap-text-muted);font-size:var(--edap-text-md);margin:0 0 32px;line-height:1.5}label{font-size:var(--edap-text-sm);font-weight:500;display:block;margin:0 0 8px}.field{margin-bottom:24px}.input-wrap{position:relative}input[type=email],input[type=password],input[type=text]{width:100%;height:48px;border:1px solid var(--edap-border);border-radius:6px;padding:0 16px;background:var(--edap-surface);color:var(--edap-ink);transition:border-color .15s}input::placeholder{color:var(--edap-text-muted);font-size:var(--edap-text-sm)}input:focus{outline:none;border-color:var(--az-blue);box-shadow:0 0 0 3px #2b50a312}#password{padding-right:72px}.toggle{position:absolute;right:6px;top:6px;height:36px;padding:0 10px;border:0;background:transparent;color:var(--edap-text-muted);font-size:var(--edap-text-xs);cursor:pointer}.options{display:flex;justify-content:space-between;align-items:center;margin:4px 0 28px;gap:16px;font-size:var(--edap-text-sm)}.remember{display:flex;gap:8px;align-items:center;margin:0;font-weight:400;color:var(--edap-text)}.remember input{accent-color:var(--az-blue);height:16px;width:16px;margin:0}.submit{width:100%;height:48px;border:0;border-radius:6px;background:var(--az-orange);color:var(--edap-on-dark);font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:12px;transition:background .15s}.submit:hover{background:var(--az-orange-700)}.submit span{font-size:var(--edap-text-xl);font-weight:400}.secure{display:flex;align-items:center;justify-content:center;gap:8px;font-size:var(--edap-text-xs);color:var(--edap-text-muted);margin:24px 0 0}.secure svg{width:13px;height:13px}.note{font-size:var(--edap-text-xs);line-height:1.5;color:var(--edap-text-muted);text-align:center;border-top:1px solid var(--edap-border-subtle);padding-top:24px;margin-top:32px}.footer{display:flex;justify-content:space-between;gap:16px;color:var(--edap-text-muted);font-size:var(--edap-text-xs)}.footer a{color:var(--edap-text-muted)}.footer strong{color:var(--edap-text);font-weight:600}dialog{border:1px solid var(--edap-border);border-radius:12px;padding:32px;max-width:420px;width:calc(100% - 40px);color:var(--edap-ink);box-shadow:var(--az-shadow-lg)}dialog::backdrop{background:#14264566}dialog h3{font-size:var(--edap-text-xl);line-height:1.25;margin:0 0 12px}dialog p{font-size:var(--edap-text-sm);color:var(--edap-text-muted);line-height:1.5}dialog button{background:var(--az-blue);color:white;border:0;border-radius:6px;padding:12px 24px;cursor:pointer}#status{font-size:var(--edap-text-sm);line-height:1.5;color:var(--az-blue);margin-top:16px}#status:empty{display:none}@media(min-width:1500px){.story{padding:56px 80px}}@media(max-width:850px){.layout{grid-template-columns:38% 62%}.story{padding:36px 28px}h1{font-size:43px;letter-spacing:-1.8px}.story-copy>p{font-size:var(--edap-text-md)}.content{padding:36px 9%}.accent{width:90px;height:90px}}@media(max-width:620px){.layout{display:block}.story{padding:24px 24px;background:var(--az-blue-900)}.logo{font-size:1.75rem}.story-copy,.story-foot,.orbit,.accent,.small-ring{display:none}.content{padding:24px 24px;min-height:calc(100svh - 80px)}.topline{font-size:var(--edap-text-xs)}.form-wrap{padding:44px 0;max-width:400px}h2{font-size:var(--edap-text-2xl)}.footer{flex-wrap:wrap}}
+
+.story-copy{max-width:100%}h1{font-size:clamp(36px,3.5vw,56px);letter-spacing:-1.8px}h1>span,h1>em{display:block}h1>span{white-space:nowrap}.story-copy>p{max-width:370px}.help-link{border:0;padding:0;background:none;color:var(--az-blue);font:inherit;cursor:pointer}.help-link:hover{text-decoration:underline}.topline .help-link{font-weight:600}.dialog-close{position:absolute;right:12px;top:10px}dialog .dialog-close{background:transparent;color:var(--edap-icon);padding:4px 10px;font-size:var(--edap-text-xl)}dialog h3{padding-right:24px}dialog{max-height:calc(100svh - 32px);overflow:auto}dialog .prepare-request{margin-top:16px}#request-result{margin-top:24px}#request-message{width:100%;font:inherit;font-size:var(--edap-text-sm);line-height:1.5;padding:12px;border:1px solid var(--edap-border);border-radius:6px;resize:vertical;color:var(--edap-ink)}dialog .help-instruction,dialog #copy-status{font-size:var(--edap-text-sm)}#copy-status:empty{display:none}@media(min-width:621px) and (max-width:1100px){.layout{grid-template-columns:46% 54%}.story{padding:36px 28px}h1{font-size:clamp(27px,3.4vw,38px);letter-spacing:-1px}.content{padding:32px 7%}}
+.brand-expansion{margin:8px 0 0;color:var(--edap-on-dark-muted);font-size:var(--edap-text-sm);line-height:1.5}@media(max-width:620px){.brand-expansion{font-size:var(--edap-text-xs);margin-top:4px}}
+</style>
+</head>
+<body>
+<main class="layout">
+<aside class="story" aria-label="EDAP">
+<a class="logo" href="login.html" aria-label="EDAP sign in">EDAP<span>.</span></a>
+<p class="brand-expansion">Enterprise Data Access Platform</p>
+<div class="story-copy"><div class="eyebrow">YOUR DATA, CONNECTED</div><h1><span>Your applications.</span><span>Your data.</span><em>Connected.</em></h1><p>Connect your applications, manage extractions, and keep your data current.</p></div>
+<div class="story-foot"><i aria-hidden="true"></i>Connect. Collect. Understand.</div><div class="orbit" aria-hidden="true"></div><div class="accent" aria-hidden="true"></div><div class="small-ring" aria-hidden="true"></div>
+</aside>
+<section class="content" aria-labelledby="login-title">
+<div class="topline">New to EDAP? <button class="help-link" type="button" data-dialog="access">Request access</button></div>
+<div class="form-wrap">
+<div class="badge" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M14 4h5v16h-5M3 12h12m-5-5 5 5-5 5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+<h2 id="login-title">Welcome back</h2><p class="intro">Sign in to manage your connections and extractions.</p>
+<form id="login-form">
+<div class="field"><label for="email">Work email</label><input id="email" name="email" type="email" autocomplete="username" placeholder="you@company.com" required></div>
+<div class="field"><label for="password">Password</label><div class="input-wrap"><input id="password" name="password" type="password" autocomplete="current-password" placeholder="Enter your password" required><button class="toggle" type="button" aria-controls="password" aria-pressed="false">Show</button></div></div>
+<div class="options"><button class="help-link" type="button" data-dialog="reset">Forgot password?</button></div>
+<button class="submit" type="submit">Sign in <span aria-hidden="true">→</span></button><div id="status" role="status"></div>
+</form>
+</div>
+<footer class="footer"><span>© 2026 EDAP. All rights reserved.</span><span>Powered by <strong>Aziro</strong></span></footer>
+</section>
+</main>
+<dialog id="info-dialog" aria-labelledby="dialog-title" aria-describedby="dialog-copy">
+<button type="button" id="close-dialog" class="dialog-close" aria-label="Close help">×</button>
+<h3 id="dialog-title"></h3><p id="dialog-copy"></p>
+<form id="help-form"><label for="help-email">Work email</label><input id="help-email" type="email" autocomplete="email" placeholder="you@company.com" required><button type="submit" class="prepare-request">Prepare request</button></form>
+<div id="request-result" hidden><label for="request-message">Message for your workspace administrator</label><textarea id="request-message" rows="5" readonly></textarea><p class="help-instruction">Copy this message and send it to your organization’s IT support or workspace administrator. No request is sent from this page.</p><button type="button" id="copy-request">Copy message</button><p id="copy-status" role="status"></p></div>
+</dialog>
+<script>
+const password=document.querySelector('#password');
+document.querySelector('.toggle').addEventListener('click',event=>{const show=password.type==='password';password.type=show?'text':'password';event.currentTarget.textContent=show?'Hide':'Show';event.currentTarget.setAttribute('aria-pressed',String(show));});
+document.querySelector('#login-form').addEventListener('submit',event=>{event.preventDefault();document.querySelector('#password').value='';window.location.href='app.html#overview';});
+const dialog=document.querySelector('#info-dialog');
+let helpMode='access';
+document.querySelectorAll('[data-dialog]').forEach(button=>button.addEventListener('click',()=>{
+ helpMode=button.dataset.dialog;
+ const reset=helpMode==='reset';
+ document.querySelector('#dialog-title').textContent=reset?'Get help signing in':'Request workspace access';
+ document.querySelector('#dialog-copy').textContent=reset?'Ask your workspace administrator to help reset your password. Enter your work email to prepare a support message. Never include your password.':'Workspace access is managed by your organization. Enter your work email to prepare an access request for your administrator.';
+ document.querySelector('#help-email').value=document.querySelector('#email').value;
+ document.querySelector('#help-form').hidden=false;
+ document.querySelector('#request-result').hidden=true;
+ document.querySelector('#copy-status').textContent='';
+ dialog.showModal();document.querySelector('#help-email').focus();
+}));
+document.querySelector('#help-form').addEventListener('submit',event=>{
+ event.preventDefault();const email=document.querySelector('#help-email').value.trim();
+ document.querySelector('#request-message').value=helpMode==='reset'
+  ?`Hello, I need help resetting my EDAP password for ${email}. Please let me know the steps to regain access. Thank you.`
+  :`Hello, I would like access to the EDAP workspace using ${email} to manage application connections and data extractions. Please let me know how to get started. Thank you.`;
+ document.querySelector('#request-result').hidden=false;
+ document.querySelector('#request-message').focus();
+});
+document.querySelector('#copy-request').addEventListener('click',async()=>{
+ const message=document.querySelector('#request-message');
+ try{await navigator.clipboard.writeText(message.value);document.querySelector('#copy-status').textContent='Copied. Send the message to your workspace administrator.';}
+ catch{message.focus();message.select();document.querySelector('#copy-status').textContent='Select and copy the message, then send it to your workspace administrator.';}
+});
+document.querySelector('#close-dialog').addEventListener('click',()=>dialog.close());
+</script>
+</body>
+</html>

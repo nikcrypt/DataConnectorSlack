@@ -1,0 +1,64 @@
+/* ==========================================================================
+   EDAP PRODUCT UI — semantic tokens
+   Builds on tokens.css (Aziro brand). Loaded by app.html and login.html.
+   Text colors meet WCAG AA (4.5:1) on --edap-bg and --edap-surface-muted;
+   --edap-icon meets 3:1 for non-text marks.
+   Spacing: 4px grid (tokens.css --az-space-*), 2px half-steps below 12px.
+   Radius: 4 tags · 6 controls · 8 cards and panels · 12 popovers and dialogs · 16 large modals · 999 pills.
+   ========================================================================== */
+
+:root {
+  /* Type scale: aliases of the Aziro scale */
+  --edap-text-xs:  var(--az-text-xs);   /* 12px: captions, metadata, table headers */
+  --edap-text-sm:  var(--az-text-sm);   /* 14px: body, tables, controls */
+  --edap-text-md:  var(--az-text-base); /* 16px: card titles, lead text */
+  --edap-text-lg:  var(--az-text-lg);   /* 18px: panel and section headings */
+  --edap-text-xl:  var(--az-text-xl);   /* 22px: dialog titles, metrics, mobile page headings */
+  --edap-text-2xl: var(--az-text-2xl);  /* 28px: page headings */
+
+  /* Text */
+  --edap-ink:           #273447; /* headings and primary text, 11.8:1 */
+  --edap-text:          #526077; /* secondary text and control values, 6.0:1 */
+  --edap-text-muted:    #617086; /* captions, metadata, table headers, 4.7:1 */
+  --edap-icon:          #7f8ca1; /* icons and non-text marks only, 3.2:1 */
+  --edap-separator:     #c0c9d7; /* decorative dividers, e.g. breadcrumb slashes */
+  --edap-on-dark:       #ffffff;
+  --edap-on-dark-muted: #b9c8e6;
+
+  /* Surfaces */
+  --edap-bg:             #f6f8fb;
+  --edap-surface:        #ffffff;
+  --edap-surface-subtle: #f8fafc; /* table headers, read-only blocks */
+  --edap-surface-hover:  #f4f7fc;
+  --edap-surface-muted:  #f0f3f7; /* neutral chips and tracks */
+  --edap-surface-dark:   #1d2b45; /* tooltips, logs, toasts */
+
+  /* Borders */
+  --edap-border:        #e2e8f0;
+  --edap-border-subtle: #edf0f5; /* row dividers */
+  --edap-border-strong: #cfd8e5; /* control hover */
+
+  /* Brand blue */
+  --edap-primary:       var(--az-blue);
+  --edap-primary-hover: var(--az-blue-800);
+  --edap-blue-50:       var(--az-blue-50);
+  --edap-blue-100:      #dfe8fa;
+  --edap-blue-200:      #c3d2ee;
+  --edap-blue-700:      #3868b1; /* info text, 5.0:1 on --edap-blue-50 */
+  --edap-focus:         #92b5ef;
+
+  /* Status: text, background, border */
+  --edap-success:        #237a63;
+  --edap-success-bg:     #edf8f3;
+  --edap-success-border: #cfeadf;
+  --edap-warning:        #9c5f14;
+  --edap-warning-bg:     #fff6e7;
+  --edap-warning-border: #f3e0bd;
+  --edap-warning-accent: #e5ab5d;
+  --edap-danger:         #b03a4b;
+  --edap-danger-bg:      #fdf0f2;
+  --edap-danger-border:  #f3d2d8;
+  --edap-danger-solid:   #bd3446;
+  --edap-danger-solid-hover: #9f2637;
+  --edap-terminal-accent: #8bd3b7; /* highlights in the dark run log */
+}
