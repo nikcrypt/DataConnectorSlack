@@ -83,6 +83,21 @@ export class SlackConnector extends DataConnector {
   }
 
   /**
+   * Full-run reconciliation for catalog-style objects.
+   * Messages/threads/reactions are out of scope (no cheap full inventory of deletes).
+   * Channels skip reconcile when a channel filter is configured (partial inventory).
+   */
+  getSoftDeletePolicy(object) {
+    if (object === "channels" && this.channelIds?.length) {
+      return { reconcileOnFull: false };
+    }
+    if (object === "users" || object === "userGroups" || object === "channels" || object === "files") {
+      return { reconcileOnFull: true };
+    }
+    return { reconcileOnFull: false };
+  }
+
+  /**
    * @param {string} object
    * @param {{ checkpoint?: object, channelIds?: string[] }} [options]
    */
@@ -156,6 +171,7 @@ export class SlackConnector extends DataConnector {
     for await (const user of this.client.paginate("users.list", "members")) {
       if (user.is_bot && user.id === "USLACKBOT") continue;
 
+      const isDeleted = Boolean(user.deleted);
       yield this.record(
         "users",
         user.id,
@@ -168,11 +184,12 @@ export class SlackConnector extends DataConnector {
           email: user.profile?.email || null,
           isBot: Boolean(user.is_bot),
           isAdmin: Boolean(user.is_admin),
-          deleted: Boolean(user.deleted),
+          deleted: isDeleted,
           tz: user.tz || null,
           updated: user.updated ? String(user.updated) : null,
         },
-        user
+        user,
+        isDeleted
       );
     }
   }
@@ -443,16 +460,20 @@ export class SlackConnector extends DataConnector {
     }
   }
 
-  record(object, sourceId, data, raw) {
+  record(object, sourceId, data, raw, isDeleted = false) {
+    const deleted = Boolean(isDeleted);
     const payload = {
       connectorKey: "slack",
       object,
       sourceId: String(sourceId),
       data,
       rawData: raw,
-      isDeleted: false,
+      isDeleted: deleted,
       extractedAt: new Date().toISOString(),
     };
+    if (deleted) {
+      payload.deletedAt = new Date().toISOString();
+    }
     payload.hash = hashRecord(payload.data);
     return payload;
   }

@@ -192,6 +192,22 @@ npm run extract:jira:mongo
 npm run extract:postgres:mongo
 ```
 
+### Slack soft delete (Mongo)
+
+Records are kept in Mongo with `isDeleted` (never hard-deleted). Consumers should filter active rows:
+
+```js
+{ connectorKey: "slack", object: "users", isDeleted: false }
+```
+
+| Object | How deletes are detected |
+|---|---|
+| `users` | Slack `user.deleted` on extract, plus full-run reconciliation |
+| `channels`, `userGroups`, `files` | Full Mongo extract only: sourceIds not seen are set `isDeleted: true` + `deletedAt` |
+| `messages`, `threads`, `reactions`, `workspaces` | Not reconciled in v1 |
+
+Reconciliation runs only on **full** `extract-mongo` (not incremental), and only when at least one record was seen (avoids mass tombstones if an API call was skipped). A later full extract that sees the id again clears `isDeleted` / `deletedAt`. Channel filters (`channelIds`) disable channel reconciliation.
+
 ## 4. Seed Slack test messages (QA / demo data)
 
 Posts sample messages into a channel so you can exercise full and incremental extract without typing them by hand. Uses `SLACK_BOT_TOKEN` from `.env` (or `data/slack-auth.json`). The bot must already be a member of the channel (`/invite @YourBotName`). Bot scopes need `chat:write` (add scope → reinstall app → update token if posting fails).

@@ -38,6 +38,17 @@ export class DataConnector {
     return null;
   }
 
+  /**
+   * Soft-delete policy for Mongo full-run reconciliation.
+   * When reconcileOnFull is true, sourceIds not seen in a successful full extract
+   * are marked isDeleted=true (tombstoned), not removed.
+   * @param {string} object
+   * @returns {{ reconcileOnFull: boolean }}
+   */
+  getSoftDeletePolicy(object) {
+    return { reconcileOnFull: false };
+  }
+
   /** @returns {string} e.g. slack, postgres */
   getConnectorKey() {
     return "unknown";

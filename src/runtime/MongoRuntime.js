@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { MongoClient } from "mongodb";
+import loggerFactory from "../logger.js";
 import {
   checkpointAfterSuccess,
   checkpointScope,
@@ -7,6 +8,7 @@ import {
   requiresCheckpoint,
 } from "./checkpoint.js";
 
+const logger = loggerFactory.component("MongoRuntime");
 const DEFAULT_BATCH_SIZE = 200;
 
 /** Writes normalized records for every connector into the database named in MONGO_URL. */
@@ -165,7 +167,8 @@ export class MongoRuntime {
   }
 
   async extractObject(records, object, mode, checkpoint, startedAt, runId) {
-    const counts = { extracted: 0, upserted: 0, modified: 0 };
+    const counts = { extracted: 0, upserted: 0, modified: 0, softDeleted: 0 };
+    const seenIds = new Set();
     let batch = [];
 
     console.log(`[mongo] extracting ${object}...`);
@@ -174,7 +177,9 @@ export class MongoRuntime {
       checkpoint: checkpoint || null,
       startedAt,
     })) {
-      batch.push(toDocument(record, runId));
+      const doc = toDocument(record, runId);
+      seenIds.add(doc.sourceId);
+      batch.push(doc);
       counts.extracted += 1;
 
       if (batch.length >= this.batchSize) {
@@ -194,8 +199,28 @@ export class MongoRuntime {
       counts.modified += written.modified;
     }
 
+    const softDeletePolicy = this.connector.getSoftDeletePolicy?.(object);
+    // Require at least one seen id so a skipped/empty extract (e.g. missing_scope)
+    // cannot mass-tombstone the collection.
+    if (mode === "full" && softDeletePolicy?.reconcileOnFull && seenIds.size > 0) {
+      counts.softDeleted = await reconcileSoftDeletes(
+        records,
+        this.connectorKey,
+        object,
+        seenIds,
+        runId
+      );
+      if (counts.softDeleted) {
+        logger.info("SoftDeleteApplied", {
+          connector: this.connectorKey,
+          object,
+          count: counts.softDeleted,
+        });
+      }
+    }
+
     console.log(
-      `[mongo] ${object}: done (${counts.extracted} extracted, ${counts.upserted} inserted, ${counts.modified} updated)`
+      `[mongo] ${object}: done (${counts.extracted} extracted, ${counts.upserted} inserted, ${counts.modified} updated, ${counts.softDeleted} soft-deleted)`
     );
     return counts;
   }
@@ -206,6 +231,8 @@ function toDocument(record, runId) {
     throw new Error("Connector record is missing connectorKey, object, or sourceId");
   }
 
+  const isDeleted = Boolean(record.isDeleted);
+  const now = new Date();
   return {
     connectorKey: record.connectorKey,
     object: record.object,
@@ -214,10 +241,38 @@ function toDocument(record, runId) {
     data: record.data,
     rawData: record.rawData ?? null,
     hash: record.hash,
-    isDeleted: Boolean(record.isDeleted),
-    extractedAt: record.extractedAt ? new Date(record.extractedAt) : new Date(),
-    updatedAt: new Date(),
+    isDeleted,
+    deletedAt: isDeleted
+      ? (record.deletedAt ? new Date(record.deletedAt) : now)
+      : null,
+    extractedAt: record.extractedAt ? new Date(record.extractedAt) : now,
+    updatedAt: now,
   };
+}
+
+/**
+ * Mark active docs whose sourceId was not seen in this full extract as soft-deleted.
+ * @returns {Promise<number>} number of documents newly soft-deleted
+ */
+async function reconcileSoftDeletes(records, connectorKey, object, seenIds, runId) {
+  const now = new Date();
+  const result = await records.updateMany(
+    {
+      connectorKey,
+      object,
+      isDeleted: { $ne: true },
+      sourceId: { $nin: [...seenIds] },
+    },
+    {
+      $set: {
+        isDeleted: true,
+        deletedAt: now,
+        updatedAt: now,
+        runId: runId || null,
+      },
+    }
+  );
+  return result.modifiedCount || 0;
 }
 
 async function flushBatch(records, batch) {
