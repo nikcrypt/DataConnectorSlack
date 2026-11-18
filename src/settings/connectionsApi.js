@@ -210,7 +210,8 @@ export async function handleConnectionsApi(req, res, url, {
   return false;
 }
 
-function done(sendJson, res, status, body) {
-  sendJson(res, status, body);
+function done(sendJson, _res, status, body) {
+  // sendJson is bound as (status, body) by the settings server (res already closed over).
+  sendJson(status, body);
   return true;
 }
