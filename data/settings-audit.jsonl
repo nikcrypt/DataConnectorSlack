@@ -26,3 +26,9 @@
 {"at":"2026-10-28T05:59:42.271Z","action":"login","username":"viewer","role":"viewer"}
 {"at":"2026-11-18T05:35:23.153Z","action":"connection_create","username":"admin","role":"admin","connector":"jira","connectionId":"1cbcf063-520c-424d-af41-7d0479b7dd3f"}
 {"at":"2026-11-18T05:35:23.157Z","action":"connection_delete","username":"admin","role":"admin","connector":"jira","connectionId":"1cbcf063-520c-424d-af41-7d0479b7dd3f"}
+{"at":"2026-11-18T05:56:29.553Z","action":"login","username":"admin","role":"admin"}
+{"at":"2026-11-18T06:47:33.967Z","action":"login","username":"admin","role":"admin"}
+{"at":"2026-11-18T06:51:40.115Z","action":"login","username":"admin","role":"admin"}
+{"at":"2026-11-18T07:02:55.012Z","action":"login","username":"admin","role":"admin"}
+{"at":"2026-11-18T08:30:43.245Z","action":"connection_create","username":"admin","role":"admin","connector":"jira","connectionId":"fc8ab0f7-a50c-4e92-88bf-f798e5f79c63"}
+{"at":"2026-11-18T08:30:55.616Z","action":"connection_test","username":"admin","role":"admin","connectionId":"fc8ab0f7-a50c-4e92-88bf-f798e5f79c63","ok":true}

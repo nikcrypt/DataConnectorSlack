@@ -19,6 +19,11 @@
             "date": 1794980122449,
             "name": "data/logs/data-connector-2026-11-18.log",
             "hash": "03dc55f9ae273909c01f7994fef1d365eed57ae44100b88049d7258707443df0"
+        },
+        {
+            "date": 1794980856262,
+            "name": "data\\logs\\data-connector-2026-11-18.log",
+            "hash": "7b97381217f143d23cb9ce941349fb63592d324bc37a17b81d38a2a55ce845c6"
         }
     ],
     "hashType": "sha256"
