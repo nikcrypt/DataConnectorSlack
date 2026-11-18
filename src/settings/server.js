@@ -9,6 +9,7 @@ import {
   readConnectorConfig,
   writeConnectorConfig,
 } from "./configStore.js";
+import { handleConnectionsApi } from "./connectionsApi.js";
 import { authenticate, canEdit, canRunExtract, canView, ensureUsersFile } from "./rbac.js";
 import { getExtractJob, startExtractJob } from "./runExtract.js";
 import { createSession, destroySession, getSession } from "./sessions.js";
@@ -37,6 +38,18 @@ function parseCookies(header) {
 function sessionFromRequest(req) {
   const cookies = parseCookies(req.headers.cookie);
   return getSession(cookies.settings_session || "");
+}
+
+function corsHeaders(req) {
+  const configured = process.env.SETTINGS_CORS_ORIGIN;
+  const origin = configured || req.headers.origin || "";
+  if (!origin) return {};
+  return {
+    "Access-Control-Allow-Origin": origin === "*" ? "*" : origin,
+    "Access-Control-Allow-Credentials": origin === "*" ? "false" : "true",
+    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Methods": "GET,POST,PATCH,DELETE,OPTIONS",
+  };
 }
 
 function sendJson(res, status, body, extraHeaders = {}) {
@@ -83,27 +96,45 @@ async function serveStatic(urlPath, res) {
   }
 }
 
+function reply(req, res, status, body, extra = {}) {
+  return sendJson(res, status, body, { ...corsHeaders(req), ...extra });
+}
+
 async function requireAuth(req, res, { edit = false, run = false } = {}) {
   const session = sessionFromRequest(req);
   if (!session || !canView(session.role)) {
-    sendJson(res, 401, { error: "Login required" });
+    reply(req, res, 401, { error: "Login required" });
     return null;
   }
   if (edit && !canEdit(session.role)) {
-    sendJson(res, 403, { error: "Admin role required to edit settings" });
+    reply(req, res, 403, { error: "Admin role required to edit settings" });
     return null;
   }
   if (run && !canRunExtract(session.role)) {
-    sendJson(res, 403, { error: "Not allowed to run extracts" });
+    reply(req, res, 403, { error: "Not allowed to run extracts" });
     return null;
   }
   return session;
 }
 
 async function handleApi(req, res, url) {
-  if (req.method === "GET" && url.pathname === "/api/health") {
-    return sendJson(res, 200, { ok: true, service: "settings" });
+  const withCors = (status, body, extra = {}) => reply(req, res, status, body, extra);
+
+  if (req.method === "OPTIONS") {
+    res.writeHead(204, corsHeaders(req));
+    return res.end();
   }
+
+  if (req.method === "GET" && url.pathname === "/api/health") {
+    return withCors(200, { ok: true, service: "settings" });
+  }
+
+  const connectionsHandled = await handleConnectionsApi(req, res, url, {
+    requireAuth,
+    sendJson: withCors,
+    readJson,
+  });
+  if (connectionsHandled) return;
 
   if (req.method === "POST" && url.pathname === "/api/login") {
     const body = await readJson(req);
@@ -121,8 +152,7 @@ async function handleApi(req, res, url) {
       username: session.username,
       role: session.role,
     });
-    return sendJson(
-      res,
+    return withCors(
       200,
       { username: session.username, role: session.role },
       { "Set-Cookie": setSessionCookie(session.token) }
@@ -140,13 +170,13 @@ async function handleApi(req, res, url) {
         role: session.role,
       });
     }
-    return sendJson(res, 200, { ok: true }, { "Set-Cookie": clearSessionCookie() });
+    return withCors(200, { ok: true }, { "Set-Cookie": clearSessionCookie() });
   }
 
   if (req.method === "GET" && url.pathname === "/api/me") {
     const session = sessionFromRequest(req);
-    if (!session) return sendJson(res, 401, { error: "Not logged in" });
-    return sendJson(res, 200, { username: session.username, role: session.role });
+    if (!session) return withCors(401, { error: "Not logged in" });
+    return withCors(200, { username: session.username, role: session.role });
   }
 
   if (req.method === "GET" && url.pathname === "/api/audit") {
@@ -154,14 +184,14 @@ async function handleApi(req, res, url) {
     if (!session) return;
     const limit = Number(url.searchParams.get("limit") || 50);
     const items = await listAudit({ limit });
-    return sendJson(res, 200, { items });
+    return withCors(200, { items });
   }
 
   if (req.method === "GET" && url.pathname === "/api/connectors") {
     const session = await requireAuth(req, res);
     if (!session) return;
     const keys = await listConnectors();
-    return sendJson(res, 200, {
+    return withCors(200, {
       role: session.role,
       canEdit: canEdit(session.role),
       canRunExtract: canRunExtract(session.role),
@@ -204,7 +234,7 @@ async function handleApi(req, res, url) {
         objects,
         requestId: created.request_id,
       });
-      return sendJson(res, 202, created);
+      return withCors(202, created);
     } catch (error) {
       await appendAudit({
         action: "extract_run_failed",
@@ -213,7 +243,7 @@ async function handleApi(req, res, url) {
         connector: key,
         error: error.message,
       }).catch(() => {});
-      return sendJson(res, error.status || 500, { error: error.message });
+      return withCors(error.status || 500, { error: error.message });
     }
   }
 
@@ -222,8 +252,12 @@ async function handleApi(req, res, url) {
     const session = await requireAuth(req, res);
     if (!session) return;
     const job = getExtractJob(jobMatch[1]);
-    if (!job) return sendJson(res, 404, { error: "Job not found (jobs reset when the settings server restarts)" });
-    return sendJson(res, 200, job);
+    if (!job) {
+      return withCors(404, {
+        error: "Job not found (jobs reset when the settings server restarts)",
+      });
+    }
+    return withCors(200, job);
   }
 
   const one = url.pathname.match(/^\/api\/connectors\/([a-z0-9_-]+)$/i);
@@ -232,14 +266,14 @@ async function handleApi(req, res, url) {
     if (!session) return;
     try {
       const config = await readConnectorConfig(one[1]);
-      return sendJson(res, 200, {
+      return withCors(200, {
         key: one[1].toLowerCase(),
         canEdit: canEdit(session.role),
         canRunExtract: canRunExtract(session.role),
         config,
       });
     } catch (error) {
-      if (error.code === "ENOENT") return sendJson(res, 404, { error: "Connector config not found" });
+      if (error.code === "ENOENT") return withCors(404, { error: "Connector config not found" });
       throw error;
     }
   }
@@ -260,20 +294,20 @@ async function handleApi(req, res, url) {
         beforeKeys: before ? Object.keys(before) : [],
         afterKeys: Object.keys(saved),
       });
-      return sendJson(res, 200, {
+      return withCors(200, {
         key: one[1].toLowerCase(),
         config: saved,
         savedBy: session.username,
       });
     } catch (error) {
-      if (error.status) return sendJson(res, error.status, { error: error.message });
-      if (error.code === "ENOENT") return sendJson(res, 404, { error: "Connector config not found" });
-      if (error instanceof SyntaxError) return sendJson(res, 400, { error: "Invalid JSON" });
+      if (error.status) return withCors(error.status, { error: error.message });
+      if (error.code === "ENOENT") return withCors(404, { error: "Connector config not found" });
+      if (error instanceof SyntaxError) return withCors(400, { error: "Invalid JSON" });
       throw error;
     }
   }
 
-  return sendJson(res, 404, { error: "Not found" });
+  return withCors(404, { error: "Not found" });
 }
 
 async function handle(req, res) {

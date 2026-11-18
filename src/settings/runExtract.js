@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { ConnectorRuntimeEngine } from "../runtime/ConnectorRuntimeEngine.js";
 import { MongoRuntime } from "../runtime/MongoRuntime.js";
 import { createConnector } from "./createConnector.js";
+import { createConnectorFromConnection } from "./createConnectorFromConnection.js";
 
 /** @type {Map<string, object>} */
 const jobs = new Map();
@@ -14,8 +15,18 @@ export function getExtractJob(jobId) {
  * Start a local extract in the background.
  * target: "mongo" → MongoRuntime (npm run extract:*:mongo)
  * target: "jsonl" → ConnectorRuntimeEngine → data/output/<connector>/
+ *
+ * Pass connectionId to use credentials from a registered connection
+ * instead of process.env / fromEnv().
  */
-export function startExtractJob({ connectorKey, objects, mode, target, requestedBy }) {
+export function startExtractJob({
+  connectorKey,
+  objects,
+  mode,
+  target,
+  requestedBy,
+  connectionId = null,
+}) {
   const destination = target === "jsonl" ? "jsonl" : "mongo";
   if (destination === "mongo" && !process.env.MONGO_URL && !process.env.MONGODB_URI) {
     throw Object.assign(
@@ -29,6 +40,7 @@ export function startExtractJob({ connectorKey, objects, mode, target, requested
     id,
     request_id: id,
     connector_key: connectorKey,
+    connection_id: connectionId || null,
     objects: Array.isArray(objects) ? objects : [],
     mode: mode === "incremental" ? "incremental" : "full",
     target: destination,
@@ -59,6 +71,7 @@ export function startExtractJob({ connectorKey, objects, mode, target, requested
     request_id: id,
     status: job.status,
     connector_key: job.connector_key,
+    connection_id: job.connection_id,
     mode: job.mode,
     target: job.target,
     destination: job.destination,
@@ -70,12 +83,18 @@ async function runJob(job) {
   job.status = "running";
   job.started_at = new Date().toISOString();
   console.log(
-    `[settings-extract] ${job.id} ${job.connector_key} target=${job.target} mode=${job.mode} objects=${job.objects.join(",") || "(all)"}`
+    `[settings-extract] ${job.id} ${job.connector_key}` +
+      `${job.connection_id ? ` connection=${job.connection_id}` : ""}` +
+      ` target=${job.target} mode=${job.mode} objects=${job.objects.join(",") || "(all)"}`
   );
 
-  const connector = await createConnector(job.connector_key);
+  const connector = job.connection_id
+    ? await createConnectorFromConnection(job.connection_id)
+    : await createConnector(job.connector_key);
   const known = new Set(connector.getObjects());
- 
+  const selected = job.objects.length
+    ? job.objects
+    : (connector.getDefaultObjects?.() || connector.getObjects());
   const unknown = selected.filter((object) => !known.has(object));
   if (unknown.length) {
     throw new Error(

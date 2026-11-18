@@ -4,6 +4,8 @@ node_modules/
 .DS_Store
 data/output/
 data/bench/
+data/connections/
+data/logs/
 data/slack-auth.json
 data/google-auth.json
 certs/

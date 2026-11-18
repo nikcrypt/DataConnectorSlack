@@ -24,3 +24,5 @@
 {"at":"2026-10-28T05:59:19.329Z","action":"login","username":"admin","role":"admin"}
 {"at":"2026-10-28T05:59:33.596Z","action":"logout","username":"admin","role":"admin"}
 {"at":"2026-10-28T05:59:42.271Z","action":"login","username":"viewer","role":"viewer"}
+{"at":"2026-11-18T05:35:23.153Z","action":"connection_create","username":"admin","role":"admin","connector":"jira","connectionId":"1cbcf063-520c-424d-af41-7d0479b7dd3f"}
+{"at":"2026-11-18T05:35:23.157Z","action":"connection_delete","username":"admin","role":"admin","connector":"jira","connectionId":"1cbcf063-520c-424d-af41-7d0479b7dd3f"}
