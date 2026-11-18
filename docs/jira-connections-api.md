@@ -29,7 +29,7 @@ Demo users: `admin` / `admin123` (edit + extract), `viewer` / `viewer123` (extra
 | Method | Path | Role | Purpose |
 |---|---|---|---|
 | GET | `/api/connections/meta` | any logged-in | Supported connectors + Jira field schema |
-| GET | `/api/connections?connector=jira` | any logged-in | List connections (secrets redacted) |
+| GET | `/api/connections?connector=jira&userId=...` | any logged-in | List connections (secrets redacted); filter by `userId` optional |
 | POST | `/api/connections` | admin | Register connection |
 | GET | `/api/connections/:id` | any logged-in | Get one |
 | PATCH | `/api/connections/:id` | admin | Update (token optional) |
@@ -46,6 +46,7 @@ Content-Type: application/json
 
 {
   "connector": "jira",
+  "userId": "user-123",
   "name": "Jira · Engineering",
   "baseUrl": "https://your-team.atlassian.net",
   "email": "you@company.com",
@@ -62,6 +63,7 @@ Aliases accepted: `endpoint` → `baseUrl`, `account` → `email`, `secret` → 
 ```json
 {
   "id": "…",
+  "userId": "user-123",
   "connector": "jira",
   "name": "Jira · Engineering",
   "baseUrl": "https://your-team.atlassian.net",

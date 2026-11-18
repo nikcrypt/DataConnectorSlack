@@ -29,6 +29,7 @@ export function toPublicConnection(record) {
   if (!record) return null;
   return {
     id: record.id,
+    userId: record.userId || null,
     connector: record.connector,
     name: record.name,
     baseUrl: record.baseUrl,
@@ -43,6 +44,17 @@ export function toPublicConnection(record) {
     updatedAt: record.updatedAt,
     createdBy: record.createdBy || null,
   };
+}
+
+function normalizeUserId(value) {
+  const userId = String(value ?? "").trim();
+  if (!userId) {
+    throw Object.assign(new Error("userId is required"), { status: 400 });
+  }
+  if (userId.length > 128) {
+    throw Object.assign(new Error("userId must be at most 128 characters"), { status: 400 });
+  }
+  return userId;
 }
 
 function normalizeBaseUrl(value) {
@@ -117,9 +129,12 @@ function normalizeCreateBody(body = {}, { createdBy } = {}) {
     throw Object.assign(new Error("apiToken is required"), { status: 400 });
   }
 
+  const userId = normalizeUserId(body.userId ?? body.user_id ?? body.userid);
+
   const now = new Date().toISOString();
   return {
     id: randomUUID(),
+    userId,
     connector: "jira",
     name,
     baseUrl: normalizeBaseUrl(body.baseUrl || body.endpoint),
@@ -139,6 +154,9 @@ function normalizeCreateBody(body = {}, { createdBy } = {}) {
 function normalizePatchBody(existing, body = {}) {
   const next = { ...existing, updatedAt: new Date().toISOString() };
 
+  if (body.userId !== undefined || body.user_id !== undefined || body.userid !== undefined) {
+    next.userId = normalizeUserId(body.userId ?? body.user_id ?? body.userid);
+  }
   if (body.name !== undefined) {
     const name = String(body.name || "").trim();
     if (!name || name.length > 80) {
@@ -188,7 +206,7 @@ export async function createConnection(body, options = {}) {
   return record;
 }
 
-export async function listConnections({ connector } = {}) {
+export async function listConnections({ connector, userId } = {}) {
   await ensureDir();
   const names = await readdir(CONNECTIONS_DIR);
   const records = [];
@@ -201,9 +219,14 @@ export async function listConnections({ connector } = {}) {
       // skip corrupt files
     }
   }
-  const filtered = connector
-    ? records.filter((item) => item.connector === String(connector).toLowerCase())
-    : records;
+  let filtered = records;
+  if (connector) {
+    filtered = filtered.filter((item) => item.connector === String(connector).toLowerCase());
+  }
+  if (userId) {
+    const wanted = String(userId).trim();
+    filtered = filtered.filter((item) => String(item.userId || "") === wanted);
+  }
   return filtered.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
 }
 

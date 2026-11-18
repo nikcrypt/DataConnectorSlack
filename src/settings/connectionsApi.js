@@ -32,6 +32,7 @@ export async function handleConnectionsApi(req, res, url, {
         authTypes: ["api_token"],
         objects: jiraObjectNames(),
         fields: {
+          userId: "Frontend / app user id that owns this connection",
           name: "Connection display name",
           baseUrl: "https://your-team.atlassian.net",
           email: "Atlassian account email",
@@ -48,7 +49,8 @@ export async function handleConnectionsApi(req, res, url, {
     const session = await requireAuth(req, res);
     if (!session) return true;
     const connector = url.searchParams.get("connector") || undefined;
-    const items = await listConnections({ connector });
+    const userId = url.searchParams.get("userId") || url.searchParams.get("user_id") || undefined;
+    const items = await listConnections({ connector, userId });
     return done(sendJson, res, 200, {
       connections: items.map(toPublicConnection),
       canEdit: canEdit(session.role),
