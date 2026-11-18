@@ -61,7 +61,7 @@ export function createApp(config = loadApiConfig(), auth, authConfig, database) 
   const authenticate = requireAuth(auth, authConfig);
   app.use("/api/v1/dashboard", authenticate, createDashboardRouter(database));
   app.use("/api/v1/extractions", authenticate, createExtractionsRouter());
-  app.use("/api/v1/connections", authenticate, createConnectionsRouter());
+  app.use("/api/v1/connections", authenticate, createConnectionsRouter(database));
 
   app.use(notFound);
   app.use(errorHandler);

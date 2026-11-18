@@ -49,15 +49,66 @@ middleware checks database configuration on routes that need it. It does not
 check live connectivity; query failures still use the existing error handler.
 The activity placeholder does not require MongoDB yet.
 
-## Connection registration placeholder
+## Connection registration (Jira)
 
-`POST /api/v1/connections` requires a valid API session and returns HTTP 501
-with the existing error schema: `error.code` is `NOT_IMPLEMENTED`,
-`error.message` is `Connection registration is not implemented yet.`, and
-`error.requestId` identifies the request. The route is in `connections/router.js`.
-It does not define a registration payload, perform registration-specific
-validation, call a source system or write to MongoDB. Existing global JSON
-parsing and request protections still apply. MongoDB is not required.
+Requires a valid API session cookie and MongoDB (`MONGO_URL` / `MONGODB_URI`
+with a database name). Routes live in `connections/router.js`; persistence is in
+`connections/connectionsService.js` (MongoDB collection `connections`).
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/api/v1/connections/meta` | Field schema for the FE register form |
+| `POST` | `/api/v1/connections` | Register a Jira connection |
+
+`POST` requires role `admin` or permission `connectors.configure`. Without MongoDB
+it returns `503 DATABASE_UNAVAILABLE`.
+
+### Register body
+
+```json
+{
+  "connector": "jira",
+  "userId": "user-123",
+  "name": "Jira · Engineering",
+  "baseUrl": "https://your-team.atlassian.net",
+  "email": "you@company.com",
+  "apiToken": "atlassian-api-token",
+  "authType": "api_token",
+  "objects": ["projects", "issues", "users", "statuses", "issueTypes"]
+}
+```
+
+Aliases: `endpoint` → `baseUrl`, `account` → `email`, `secret` → `apiToken`,
+`user_id` / `userid` → `userId`.
+
+### Successful response (201)
+
+```json
+{
+  "data": {
+    "id": "…",
+    "userId": "user-123",
+    "connector": "jira",
+    "name": "Jira · Engineering",
+    "baseUrl": "https://your-team.atlassian.net",
+    "email": "you@company.com",
+    "authType": "api_token",
+    "objects": ["projects", "issues", "users", "statuses", "issueTypes"],
+    "status": "connected",
+    "hasSecret": true,
+    "lastTestAt": null,
+    "lastTestOk": null,
+    "createdAt": "…",
+    "updatedAt": "…",
+    "createdBy": "manoj"
+  },
+  "requestId": "server-generated-uuid"
+}
+```
+
+`apiToken` is stored in MongoDB but never returned. This registration path does
+not call Jira yet (no live connection test on create). List/update/delete/test/
+extract endpoints are not implemented in this slice.
 
 ## Dashboard and extraction-history placeholders
 
