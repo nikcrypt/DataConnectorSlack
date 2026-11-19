@@ -1,13 +1,28 @@
 [
   {
     "username": "viewer",
+    "displayName": "Viewer",
+    "email": "viewer@example.com",
     "role": "viewer",
+    "permissions": [
+      "workspace.view",
+      "connectors.read",
+      "extractions.run"
+    ],
     "passwordSalt": "7f2d324a86fe3ff0108c04cb52ed4d21",
     "passwordHash": "bdbea3a33bdccfbf534a4388d52d0d31fc9d2a28d7ea3619e1779d0e38f68631a75f632f86f70f5fe0d84ad34113c4440f4b3d6ee71bbb51828d4eec435cf31a"
   },
   {
     "username": "admin",
+    "displayName": "Admin",
+    "email": "admin@example.com",
     "role": "admin",
+    "permissions": [
+      "workspace.view",
+      "connectors.read",
+      "connectors.configure",
+      "extractions.run"
+    ],
     "passwordSalt": "97c8ff0e4d4ca8cbc5ec580a9dd7ba35",
     "passwordHash": "b321cbb5436d0dab236e576538c66f76abc9cfe39a7fdbfa9280bcec1e3e0b34f32abc620f1c80ce010c30c76cfba4e5ee188f40eef70a8a36e46eba77f4042d"
   }

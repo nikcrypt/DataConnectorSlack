@@ -1,12 +1,27 @@
 [
   {
     "username": "viewer",
-    "password": "viewer123",
-    "role": "viewer"
+    "displayName": "Viewer",
+    "email": "viewer@example.com",
+    "role": "viewer",
+    "permissions": [
+      "workspace.view",
+      "connectors.read",
+      "extractions.run"
+    ],
+    "password": "viewer123"
   },
   {
     "username": "admin",
-    "password": "admin123",
-    "role": "admin"
+    "displayName": "Admin",
+    "email": "admin@example.com",
+    "role": "admin",
+    "permissions": [
+      "workspace.view",
+      "connectors.read",
+      "connectors.configure",
+      "extractions.run"
+    ],
+    "password": "admin123"
   }
 ]
