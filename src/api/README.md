@@ -49,7 +49,7 @@ middleware checks database configuration on routes that need it. It does not
 check live connectivity; query failures still use the existing error handler.
 The activity placeholder does not require MongoDB yet.
 
-## Connection registration (Jira)
+## Connection registration (Jira + Slack + Oracle)
 
 Requires a valid API session cookie and MongoDB (`MONGO_URL` / `MONGODB_URI`
 with a database name). Routes live in `connections/router.js`; persistence is in
@@ -58,12 +58,12 @@ with a database name). Routes live in `connections/router.js`; persistence is in
 | Method | Path | Purpose |
 | --- | --- | --- |
 | `GET` | `/api/v1/connections/meta` | Field schema for the FE register form |
-| `POST` | `/api/v1/connections` | Register a Jira connection |
+| `POST` | `/api/v1/connections` | Register a Jira, Slack, or Oracle connection |
 
 `POST` requires role `admin` or permission `connectors.configure`. Without MongoDB
 it returns `503 DATABASE_UNAVAILABLE`.
 
-### Register body
+### Register Jira
 
 ```json
 {
@@ -81,34 +81,71 @@ it returns `503 DATABASE_UNAVAILABLE`.
 Aliases: `endpoint` → `baseUrl`, `account` → `email`, `secret` → `apiToken`,
 `user_id` / `userid` → `userId`.
 
-### Successful response (201)
+### Register Slack
 
 ```json
 {
-  "data": {
-    "id": "…",
-    "userId": "user-123",
-    "connector": "jira",
-    "name": "Jira · Engineering",
-    "baseUrl": "https://your-team.atlassian.net",
-    "email": "you@company.com",
-    "authType": "api_token",
-    "objects": ["projects", "issues", "users", "statuses", "issueTypes"],
-    "status": "connected",
-    "hasSecret": true,
-    "lastTestAt": null,
-    "lastTestOk": null,
-    "createdAt": "…",
-    "updatedAt": "…",
-    "createdBy": "manoj"
-  },
-  "requestId": "server-generated-uuid"
+  "connector": "slack",
+  "userId": "user-123",
+  "name": "Slack · Aziro",
+  "workspaceUrl": "https://your-workspace.slack.com",
+  "account": "you@company.com",
+  "botToken": "xoxb-…",
+  "userToken": "xoxp-…",
+  "authType": "bot_token",
+  "objects": ["workspaces", "users", "channels", "messages", "files"],
+  "channelIds": ["C01234567"],
+  "historyDays": 30
 }
 ```
 
-`apiToken` is stored in MongoDB but never returned. This registration path does
-not call Jira yet (no live connection test on create). List/update/delete/test/
-extract endpoints are not implemented in this slice.
+- `botToken` is required (`xoxb-…`).
+- `userToken`, `workspaceUrl`, `account`, `channelIds`, and `historyDays` are optional.
+- Aliases: `bot_token` / `token` / `secret` → `botToken`, `user_token` → `userToken`,
+  `endpoint` / `baseUrl` → `workspaceUrl`.
+
+### Register Oracle
+
+```json
+{
+  "connector": "oracle",
+  "userId": "user-123",
+  "name": "Oracle · HR",
+  "username": "app_reader",
+  "password": "your-password",
+  "connectString": "localhost:1521/XEPDB1",
+  "authType": "database_credentials",
+  "objects": ["schemas", "tables", "views", "columns"],
+  "schemas": ["HR"],
+  "pageSize": 1000
+}
+```
+
+Or without `connectString`:
+
+```json
+{
+  "connector": "oracle",
+  "userId": "user-123",
+  "name": "Oracle · HR",
+  "username": "app_reader",
+  "password": "your-password",
+  "host": "localhost",
+  "port": 1521,
+  "serviceName": "XEPDB1",
+  "objects": ["schemas", "tables", "views", "columns"]
+}
+```
+
+- Required: `username`, `password`, and either `connectString` or `host` + (`serviceName` or `sid`).
+- Optional: `schemas`, `schemaName`, `tableName`, `tablesSpec`, `pageSize`, `modifiedColumn`.
+- Aliases: `user` → `username`, `secret` → `password`, `connect_string` / `endpoint` → `connectString`.
+
+### Successful response (201)
+
+Secrets are stored in MongoDB but never returned. Responses include `hasSecret`
+(and for Slack, `hasUserToken`). This path does not call Slack/Jira on create.
+List/update/delete/test/extract endpoints are not implemented in this slice.
 
 ## Dashboard and extraction-history placeholders
 
